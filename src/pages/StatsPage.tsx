@@ -3,6 +3,7 @@ import { useAppStore } from '../store/appStore'
 import { useStats } from '../hooks/useStats'
 import { useCategories } from '../hooks/useCategories'
 import { useBudget } from '../hooks/useBudget'
+import { getMerchantEmoji } from '../lib/merchants'
 import { MonthPickerSheet } from '../components/ledger/MonthPickerSheet'
 import { BudgetSection } from '../components/budget/BudgetSection'
 
@@ -23,7 +24,7 @@ const CHART_H = AMOUNT_H + BAR_H + LABEL_H  // 96px total, no overflow
 
 export function StatsPage() {
   const { currentMonth, setCurrentMonth } = useAppStore()
-  const { categoryStats, monthlyTrend, totalExpense, totalIncome } = useStats(currentMonth)
+  const { categoryStats, merchantStats, monthlyTrend, totalExpense, totalIncome } = useStats(currentMonth)
   const { categories } = useCategories()
   const { monthlyBudgetAmount } = useBudget()
   const [showPicker, setShowPicker] = useState(false)
@@ -198,6 +199,42 @@ export function StatsPage() {
           </div>
         )}
       </div>
+
+      {/* Merchant breakdown */}
+      {merchantStats.length > 0 && (
+        <div style={section}>
+          <div style={sectionTitle}>本月商户消费</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {merchantStats.map((stat, i) => (
+              <div key={stat.name}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 18 }}>{getMerchantEmoji(stat.name)}</span>
+                    <div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>{stat.name}</span>
+                      <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 6 }}>{stat.count} 笔</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{Math.round(stat.pct * 100)}%</span>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-expense)' }}>¥{fmt(stat.amount)}</span>
+                  </div>
+                </div>
+                <div style={{ height: 5, borderRadius: 3, background: 'var(--color-bg-secondary)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${stat.pct * 100}%`,
+                    borderRadius: 3,
+                    background: `hsl(${220 - i * 18}, 70%, 58%)`,
+                    opacity: 0.75,
+                    transition: 'width 0.4s ease',
+                  }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {showPicker && (
         <MonthPickerSheet

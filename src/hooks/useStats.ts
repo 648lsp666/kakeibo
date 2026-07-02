@@ -1,11 +1,19 @@
 import { useState, useEffect } from 'react'
 import { transactionOps } from '../lib/db'
 import { useAppStore } from '../store/appStore'
+import { detectMerchant } from '../lib/merchants'
 
 export interface CategoryStat {
   categoryId: string
   amount: number
   pct: number   // 0-1
+}
+
+export interface MerchantStat {
+  name: string
+  amount: number
+  pct: number   // 0-1
+  count: number
 }
 
 export interface MonthTrend {
@@ -17,6 +25,7 @@ export interface MonthTrend {
 
 export function useStats(yearMonth: string) {
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([])
+  const [merchantStats, setMerchantStats] = useState<MerchantStat[]>([])
   const [monthlyTrend, setMonthlyTrend] = useState<MonthTrend[]>([])
   const [totalExpense, setTotalExpense] = useState(0)
   const [totalIncome, setTotalIncome] = useState(0)
@@ -45,6 +54,19 @@ export function useStats(yearMonth: string) {
         .map(([categoryId, amount]) => ({ categoryId, amount, pct: expense > 0 ? amount / expense : 0 }))
       setCategoryStats(stats)
 
+      // Merchant breakdown
+      const merchantMap = new Map<string, { amount: number; count: number }>()
+      for (const tx of expTxs) {
+        const merchant = detectMerchant(tx.note)
+        if (!merchant) continue
+        const cur = merchantMap.get(merchant) ?? { amount: 0, count: 0 }
+        merchantMap.set(merchant, { amount: cur.amount + tx.amount, count: cur.count + 1 })
+      }
+      const mStats: MerchantStat[] = [...merchantMap.entries()]
+        .sort((a, b) => b[1].amount - a[1].amount)
+        .map(([name, { amount, count }]) => ({ name, amount, count, pct: expense > 0 ? amount / expense : 0 }))
+      setMerchantStats(mStats)
+
       // 6-month trend ending at yearMonth
       const [y, m] = yearMonth.split('-').map(Number)
       const trend: MonthTrend[] = []
@@ -64,5 +86,5 @@ export function useStats(yearMonth: string) {
     load()
   }, [yearMonth, refreshSignal])
 
-  return { categoryStats, monthlyTrend, totalExpense, totalIncome }
+  return { categoryStats, merchantStats, monthlyTrend, totalExpense, totalIncome }
 }
