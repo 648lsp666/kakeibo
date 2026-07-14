@@ -71,7 +71,7 @@ export function TabBar() {
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0,
-          boxShadow: '0 8px 20px rgba(89, 113, 82, 0.3)',
+          boxShadow: 'var(--shadow-fab)',
           margin: '-18px 6px 0',
         }}
       >

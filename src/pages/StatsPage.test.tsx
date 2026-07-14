@@ -6,7 +6,7 @@ import { StatsPage } from './StatsPage'
 vi.mock('../hooks/useStats', () => ({
   useStats: () => ({
     categoryStats: [{ categoryId: 'food', amount: 128.5, pct: 1 }],
-    merchantStats: [],
+    merchantStats: [{ name: '这是一个非常非常长的商户名称用于验证移动端布局', amount: 128.5, pct: 1, count: 1 }],
     monthlyTrend: [{ yearMonth: '2026-07', monthLabel: '7月', expense: 128.5, income: 500 }],
     totalExpense: 128.5,
     totalIncome: 500,
@@ -59,4 +59,16 @@ it('uses semantic accent text tokens while preserving chart accent graphics', ()
   })
   expect((screen.getByText('月预算').previousElementSibling as HTMLElement).style.borderTop)
     .toBe('1.5px dashed var(--color-warning)')
+})
+
+it('constrains long merchant names so amounts retain their own column', () => {
+  render(<StatsPage />)
+
+  const merchant = screen.getByText('这是一个非常非常长的商户名称用于验证移动端布局')
+  expect(merchant).toHaveStyle({
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  })
+  expect(merchant.parentElement).toHaveStyle({ minWidth: '0' })
 })

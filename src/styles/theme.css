@@ -22,8 +22,16 @@
   --color-warning: #b6813f;
   --color-warning-text: #76501d;
   --color-danger-soft: #f9e7e3;
+  --color-on-danger: #12170f;
+  --color-source-wechat: var(--color-income-text);
+  --color-source-wechat-soft: var(--color-primary-soft);
+  --color-source-alipay: var(--color-primary-text);
+  --color-source-alipay-soft: var(--color-primary-soft);
+  --color-source-bank: var(--color-warning-text);
+  --color-source-bank-soft: var(--color-bg-secondary);
   --color-overlay: rgb(35 44 32 / 48%);
   --shadow-card: 0 10px 30px rgb(76 91 62 / 10%);
+  --shadow-fab: 0 8px 20px rgb(89 113 82 / 30%);
   --radius-hero: 22px;
   --radius-card: 16px;
   --radius-control: 14px;
@@ -72,7 +80,9 @@
     --color-warning: #d3a15e;
     --color-warning-text: #edbd77;
     --color-danger-soft: #442c2a;
+    --color-on-danger: #12170f;
     --color-overlay: rgb(8 12 8 / 68%);
     --shadow-card: inset 0 0 0 1px rgb(255 255 255 / 4%);
+    --shadow-fab: 0 8px 20px rgb(8 12 8 / 35%);
   }
 }

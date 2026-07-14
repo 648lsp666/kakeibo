@@ -211,15 +211,15 @@ export function StatsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {merchantStats.map((stat) => (
               <div key={stat.name}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 5 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                     <span style={rowIcon}><Icon name="wallet" size={18} /></span>
-                    <div>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>{stat.name}</span>
+                    <div style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stat.name}</span>
                       <span style={{ fontSize: 10, color: 'var(--color-text-small)', marginLeft: 6 }}>{stat.count} 笔</span>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, gap: 8 }}>
                     <span style={{ fontSize: 11, color: 'var(--color-text-small)' }}>{Math.round(stat.pct * 100)}%</span>
                     <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-expense-text)' }}>¥{fmt(stat.amount)}</span>
                   </div>

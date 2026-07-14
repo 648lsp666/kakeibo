@@ -17,10 +17,10 @@ const SOURCE_LABEL: Record<string, string> = {
 }
 
 const SOURCE_STYLE: Record<string, { bg: string; color: string }> = {
-  manual: { bg: 'var(--color-bg-secondary)', color: 'var(--color-text-tertiary)' },
-  wechat: { bg: 'rgba(7,193,96,0.12)', color: '#07c160' },
-  alipay: { bg: 'rgba(0,160,233,0.12)', color: '#0094d8' },
-  bank: { bg: 'rgba(139,92,246,0.12)', color: '#7c3aed' },
+  manual: { bg: 'var(--color-bg-secondary)', color: 'var(--color-text-small)' },
+  wechat: { bg: 'var(--color-source-wechat-soft)', color: 'var(--color-source-wechat)' },
+  alipay: { bg: 'var(--color-source-alipay-soft)', color: 'var(--color-source-alipay)' },
+  bank: { bg: 'var(--color-source-bank-soft)', color: 'var(--color-source-bank)' },
 }
 
 const DELETE_W = 72
@@ -50,14 +50,14 @@ export function TransactionItem({ tx, category, onDelete }: Props) {
       {/* Delete button revealed on left swipe */}
       <div style={{
         position: 'absolute', right: 0, top: 0, bottom: 0, width: DELETE_W,
-        background: '#ef4444',
+        background: 'var(--color-expense)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <button
           type="button"
           aria-label="删除记录"
           onClick={() => { if (confirm('删除这条记录？')) onDelete(tx.id) }}
-          style={{ width: '100%', height: '100%', color: '#fff', background: 'none', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 10px', lineHeight: 1.4, textAlign: 'center', display: 'grid', justifyItems: 'center', alignContent: 'center', gap: 3 }}
+          style={{ width: '100%', height: '100%', color: 'var(--color-on-danger)', background: 'none', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 10px', lineHeight: 1.4, textAlign: 'center', display: 'grid', justifyItems: 'center', alignContent: 'center', gap: 3 }}
         >
           <Icon name="trash" size={18} />
           <span>删除</span>

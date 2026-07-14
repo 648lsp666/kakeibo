@@ -26,6 +26,16 @@ const token = (theme: string, name: string) => {
   return value as string
 }
 
+const baseTheme = themeCss.match(/:root\s*\{([^}]*)\}/)?.[1] ?? ''
+
+const resolvedToken = (theme: string, name: string): string => {
+  const pattern = new RegExp(`--${name}:\\s*([^;]+);`, 'i')
+  const value = (theme.match(pattern) ?? baseTheme.match(pattern))?.[1].trim()
+  expect(value, `missing --${name}`).toBeDefined()
+  const reference = value?.match(/^var\(--([^)]+)\)$/)?.[1]
+  return reference ? resolvedToken(theme, reference) : value as string
+}
+
 it('keeps the small-text token at 4.5:1 against Task 4 surfaces in both themes', () => {
   const themes = [...themeCss.matchAll(/:root\s*\{([^}]*)\}/g)].map((match) => match[1])
   expect(themes).toHaveLength(2)
@@ -77,5 +87,22 @@ it('keeps the selected budget period semantic pair at 4.5:1 in both themes', () 
       contrast(token(theme, 'color-on-primary'), token(theme, 'color-primary')),
       'color-on-primary on color-primary',
     ).toBeGreaterThanOrEqual(4.5)
+  }
+})
+
+it('keeps imported-source badge text at 4.5:1 in both themes', () => {
+  const themes = [...themeCss.matchAll(/:root\s*\{([^}]*)\}/g)].map((match) => match[1])
+  expect(themes).toHaveLength(2)
+
+  for (const theme of themes) {
+    for (const source of ['wechat', 'alipay', 'bank']) {
+      expect(
+        contrast(
+          resolvedToken(theme, `color-source-${source}`),
+          resolvedToken(theme, `color-source-${source}-soft`),
+        ),
+        `${source} source badge contrast`,
+      ).toBeGreaterThanOrEqual(4.5)
+    }
   }
 })

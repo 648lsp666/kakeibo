@@ -15,6 +15,8 @@ it('switches tabs and exposes the active page', async () => {
 
 it('opens add entry from the central action', async () => {
   render(<TabBar />)
-  await userEvent.click(screen.getByRole('button', { name: '记一笔' }))
+  const addButton = screen.getByRole('button', { name: '记一笔' })
+  expect(addButton).toHaveStyle({ boxShadow: 'var(--shadow-fab)' })
+  await userEvent.click(addButton)
   expect(useAppStore.getState().isAddSheetOpen).toBe(true)
 })
