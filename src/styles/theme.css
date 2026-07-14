@@ -9,6 +9,7 @@
   --color-text-tertiary: #9ca597;
   --color-border: #e2e5d8;
   --color-primary: #718b61;
+  --color-on-primary: #12170f;
   --color-primary-strong: #58734c;
   --color-primary-soft: #e1ebd3;
   --color-income: #4f8a70;
@@ -27,7 +28,7 @@
   --color-tab-active: var(--color-primary-strong);
   --color-tab-inactive: var(--color-text-tertiary);
   --color-fab-bg: var(--color-primary);
-  --color-fab-text: #ffffff;
+  --color-fab-text: var(--color-on-primary);
   --color-header-bg: var(--color-bg-secondary);
   --color-stat-card: var(--color-bg-card);
   --color-stat-shadow: var(--shadow-card);
@@ -52,6 +53,7 @@
     --color-text-tertiary: #858f80;
     --color-border: #394135;
     --color-primary: #9db88b;
+    --color-on-primary: #12170f;
     --color-primary-strong: #b4cba4;
     --color-primary-soft: #34422f;
     --color-income: #7fc39f;
