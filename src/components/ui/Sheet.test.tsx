@@ -1,5 +1,6 @@
 import React from 'react'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { Sheet } from './Sheet'
 
@@ -84,4 +85,101 @@ it('uses the semantic small-text token for the description', () => {
   expect(screen.getByText('说明文字')).toHaveStyle({
     color: 'var(--color-text-small)',
   })
+})
+
+it('moves focus to the preferred autofocus control when opened', () => {
+  motionMock.reducedMotion.mockReturnValue(false)
+
+  render(
+    <Sheet open title="测试" onClose={() => undefined}>
+      <button type="button">普通操作</button>
+      <input aria-label="首选输入" data-autofocus />
+    </Sheet>,
+  )
+
+  expect(screen.getByLabelText('首选输入')).toHaveFocus()
+})
+
+it('wraps focus from the last control to the first with Tab', async () => {
+  motionMock.reducedMotion.mockReturnValue(false)
+  const user = userEvent.setup()
+
+  render(
+    <Sheet open title="测试" onClose={() => undefined}>
+      <button type="button">第一个操作</button>
+      <button type="button">最后一个操作</button>
+    </Sheet>,
+  )
+
+  const first = screen.getByRole('button', { name: '关闭' })
+  const last = screen.getByRole('button', { name: '最后一个操作' })
+  last.focus()
+  await user.tab()
+
+  expect(first).toHaveFocus()
+})
+
+it('wraps focus from the first control to the last with Shift+Tab', async () => {
+  motionMock.reducedMotion.mockReturnValue(false)
+  const user = userEvent.setup()
+
+  render(
+    <Sheet open title="测试" onClose={() => undefined}>
+      <button type="button">第一个操作</button>
+      <button type="button">最后一个操作</button>
+    </Sheet>,
+  )
+
+  const first = screen.getByRole('button', { name: '关闭' })
+  const last = screen.getByRole('button', { name: '最后一个操作' })
+  first.focus()
+  await user.tab({ shift: true })
+
+  expect(last).toHaveFocus()
+})
+
+it('closes on Escape and restores focus to the previously active element', async () => {
+  motionMock.reducedMotion.mockReturnValue(false)
+  const user = userEvent.setup()
+
+  function Harness() {
+    const [open, setOpen] = React.useState(false)
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>打开弹层</button>
+        <Sheet open={open} title="测试" onClose={() => setOpen(false)}>
+          <input aria-label="弹层输入" data-autofocus />
+        </Sheet>
+      </>
+    )
+  }
+
+  render(<Harness />)
+  const trigger = screen.getByRole('button', { name: '打开弹层' })
+  await user.click(trigger)
+  expect(screen.getByLabelText('弹层输入')).toHaveFocus()
+
+  await user.keyboard('{Escape}')
+
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(trigger).toHaveFocus()
+})
+
+it('restores focus when the open Sheet unmounts', () => {
+  motionMock.reducedMotion.mockReturnValue(false)
+  const trigger = document.createElement('button')
+  document.body.append(trigger)
+  trigger.focus()
+
+  const { unmount } = render(
+    <Sheet open title="测试" onClose={() => undefined}>
+      <input aria-label="弹层输入" data-autofocus />
+    </Sheet>,
+  )
+  expect(screen.getByLabelText('弹层输入')).toHaveFocus()
+
+  unmount()
+
+  expect(trigger).toHaveFocus()
+  trigger.remove()
 })

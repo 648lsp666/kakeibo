@@ -82,7 +82,7 @@ export function CategoryForm({ onSave, onCancel }: Props) {
       <div
         role="group"
         aria-labelledby="category-icon-label"
-        style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8, marginBottom: 18 }}
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(var(--tap-size), 1fr))', gap: 8, marginBottom: 18 }}
       >
         {CATEGORY_ICON_OPTIONS.map((optionIcon) => (
           <button
@@ -101,6 +101,7 @@ export function CategoryForm({ onSave, onCancel }: Props) {
               display: 'flex',
               justifyContent: 'center',
               minHeight: 'var(--tap-size)',
+              minWidth: 'var(--tap-size)',
             }}
           >
             <Icon name={optionIcon} size={20} />

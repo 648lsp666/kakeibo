@@ -1,6 +1,15 @@
-import { useId } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Icon } from './Icon'
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
 
 export interface SheetProps {
   open: boolean
@@ -24,6 +33,58 @@ export function Sheet({
   const titleId = useId()
   const descriptionId = useId()
   const shouldReduceMotion = useReducedMotion()
+  const surfaceRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+    const surface = surfaceRef.current
+    const autofocusTarget = surface?.querySelector<HTMLElement>('[data-autofocus]')
+    const firstFocusable = surface?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
+    const focusTarget = autofocusTarget ?? firstFocusable ?? surface
+
+    focusTarget?.focus()
+
+    return () => {
+      if (previouslyFocused?.isConnected) previouslyFocused.focus()
+    }
+  }, [open])
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      onClose()
+      return
+    }
+
+    if (event.key !== 'Tab') return
+
+    const surface = surfaceRef.current
+    if (!surface) return
+
+    const focusable = Array.from(surface.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+      .filter((element) => !element.matches(':disabled') && element.tabIndex >= 0)
+
+    if (focusable.length === 0) {
+      event.preventDefault()
+      surface.focus()
+      return
+    }
+
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
 
   return (
     <AnimatePresence>
@@ -44,15 +105,18 @@ export function Sheet({
           }}
         >
           <motion.section
+            ref={surfaceRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
             aria-describedby={description ? descriptionId : undefined}
+            tabIndex={-1}
             initial={shouldReduceMotion ? undefined : { y: '100%' }}
             animate={shouldReduceMotion ? undefined : { y: 0 }}
             exit={shouldReduceMotion ? undefined : { y: '100%' }}
             transition={shouldReduceMotion ? undefined : { type: 'spring', damping: 30, stiffness: 300 }}
             onClick={(event) => event.stopPropagation()}
+            onKeyDown={handleKeyDown}
             style={{
               background: 'var(--color-bg-elevated)',
               borderRadius: 'var(--radius-hero) var(--radius-hero) 0 0',

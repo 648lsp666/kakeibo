@@ -23,3 +23,11 @@ it('shows inline validation for an empty name', async () => {
   expect(screen.getByRole('alert')).toHaveTextContent('请输入分类名称')
   expect(onSave).not.toHaveBeenCalled()
 })
+
+it('uses responsive columns that preserve the minimum tap width', () => {
+  render(<CategoryForm onSave={() => {}} onCancel={() => {}} />)
+
+  expect(screen.getByRole('group', { name: '选择图标' })).toHaveStyle({
+    gridTemplateColumns: 'repeat(auto-fit, minmax(var(--tap-size), 1fr))',
+  })
+})

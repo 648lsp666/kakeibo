@@ -26,8 +26,10 @@ export function useCategories() {
     const existing = await categoryOps.list()
     const maxSort = existing.reduce((m, c) => Math.max(m, c.sortOrder), 0)
     const cat: Category = {
-      ...input,
       id: nanoid(),
+      name: input.name,
+      icon: input.icon,
+      type: input.type,
       isSystem: false,
       sortOrder: maxSort + 1,
       createdAt: new Date().toISOString(),
