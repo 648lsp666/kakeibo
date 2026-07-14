@@ -32,17 +32,17 @@ export function MonthHeader({ yearMonth, summary, importButton, onPrev, onNext, 
         </div>
         <div className="ledger-hero__secondary-action" style={{ flexShrink: 0 }}>{importButton}</div>
       </div>
-      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 650, marginBottom: 5 }}>本月支出</div>
+      <div style={{ fontSize: 11, color: 'var(--color-text-small)', fontWeight: 650, marginBottom: 5 }}>本月支出</div>
       <div style={{ fontSize: 'clamp(34px, 11vw, 46px)', fontWeight: 900, color: 'var(--color-text)', lineHeight: 1, letterSpacing: -1.5, overflowWrap: 'anywhere' }}>
         ¥{fmt(summary.expense)}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginTop: 18 }}>
         <div style={{ minWidth: 0, background: 'var(--color-bg-secondary)', borderRadius: 14, padding: '12px 13px' }}>
-          <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 5, fontWeight: 700, letterSpacing: .7 }}>收入</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-income)', overflow: 'hidden', textOverflow: 'ellipsis' }}>¥{fmt(summary.income)}</div>
+          <div style={{ fontSize: 10, color: 'var(--color-text-small)', marginBottom: 5, fontWeight: 700, letterSpacing: .7 }}>收入</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-income-text)', overflow: 'hidden', textOverflow: 'ellipsis' }}>¥{fmt(summary.income)}</div>
         </div>
         <div style={{ minWidth: 0, background: 'var(--color-bg-secondary)', borderRadius: 14, padding: '12px 13px' }}>
-          <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 5, fontWeight: 700, letterSpacing: .7 }}>结余</div>
+          <div style={{ fontSize: 10, color: 'var(--color-text-small)', marginBottom: 5, fontWeight: 700, letterSpacing: .7 }}>结余</div>
           <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis' }}>¥{fmt(summary.balance)}</div>
         </div>
       </div>

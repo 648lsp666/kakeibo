@@ -5,10 +5,10 @@ import { StatsPage } from './StatsPage'
 
 vi.mock('../hooks/useStats', () => ({
   useStats: () => ({
-    categoryStats: [{ categoryId: 'food', amount: 128.5, pct: 1 }],
-    merchantStats: [{ name: '这是一个非常非常长的商户名称用于验证移动端布局', amount: 128.5, pct: 1, count: 1 }],
-    monthlyTrend: [{ yearMonth: '2026-07', monthLabel: '7月', expense: 128.5, income: 500 }],
-    totalExpense: 128.5,
+    categoryStats: [{ categoryId: 'food', amount: 123456.78, pct: 1 }],
+    merchantStats: [{ name: '这是一个非常非常长的商户名称用于验证移动端布局', amount: 123456.78, pct: 1, count: 1 }],
+    monthlyTrend: [{ yearMonth: '2026-07', monthLabel: '7月', expense: 123456.78, income: 500 }],
+    totalExpense: 123456.78,
     totalIncome: 500,
   }),
 }))
@@ -40,7 +40,7 @@ it('shows the current-month summary, six-month trend, and category spending', ()
   expect(screen.getByText('本月支出')).toBeInTheDocument()
   expect(screen.getByText('近 6 个月')).toBeInTheDocument()
   expect(screen.getByText('餐饮')).toBeInTheDocument()
-  expect(screen.getAllByText('¥128.50')).not.toHaveLength(0)
+  expect(screen.getAllByText('¥123,456.78')).not.toHaveLength(0)
 })
 
 it('uses semantic accent text tokens while preserving chart accent graphics', () => {
@@ -71,4 +71,8 @@ it('constrains long merchant names so amounts retain their own column', () => {
     whiteSpace: 'nowrap',
   })
   expect(merchant.parentElement).toHaveStyle({ minWidth: '0' })
+  const amounts = screen.getAllByText('¥123,456.78')
+  const amount = amounts[amounts.length - 1]
+  expect(amount).toBeInTheDocument()
+  expect(amount?.parentElement).toHaveStyle({ flexShrink: '0' })
 })

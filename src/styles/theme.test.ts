@@ -106,3 +106,27 @@ it('keeps imported-source badge text at 4.5:1 in both themes', () => {
     }
   }
 })
+
+it('keeps Task 8 foreground aliases safe on their actual surfaces in both themes', () => {
+  const themes = [...themeCss.matchAll(/:root\s*\{([^}]*)\}/g)].map((match) => match[1])
+  expect(themes).toHaveLength(2)
+
+  const actualPairs = [
+    ['color-text-small', 'color-bg-card'],
+    ['color-text-small', 'color-bg-secondary'],
+    ['color-income-text', 'color-bg-card'],
+    ['color-income-text', 'color-bg-secondary'],
+    ['color-income-text', 'color-bg'],
+    ['color-expense-text', 'color-bg-card'],
+    ['color-expense-text', 'color-bg'],
+  ] as const
+
+  for (const theme of themes) {
+    for (const [foreground, surface] of actualPairs) {
+      expect(
+        contrast(token(theme, foreground), token(theme, surface)),
+        `${foreground} on ${surface}`,
+      ).toBeGreaterThanOrEqual(4.5)
+    }
+  }
+})

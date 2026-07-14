@@ -47,7 +47,7 @@ export function TabBar() {
             borderRadius: 14,
             cursor: 'pointer',
             padding: '3px 0',
-            color: activeTab === tab.id ? 'var(--color-primary-strong)' : 'var(--color-text-tertiary)',
+            color: activeTab === tab.id ? 'var(--color-primary-strong)' : 'var(--color-text-small)',
           }}
         >
           <Icon name={tab.icon} size={20} />
@@ -98,7 +98,7 @@ export function TabBar() {
             borderRadius: 14,
             cursor: 'pointer',
             padding: '3px 0',
-            color: activeTab === tab.id ? 'var(--color-primary-strong)' : 'var(--color-text-tertiary)',
+            color: activeTab === tab.id ? 'var(--color-primary-strong)' : 'var(--color-text-small)',
           }}
         >
           <Icon name={tab.icon} size={20} />

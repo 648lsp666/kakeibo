@@ -28,7 +28,7 @@ const DELETE_W = 72
 export function TransactionItem({ tx, category, onDelete }: Props) {
   const isExpense = tx.type === 'expense'
   const sign = isExpense ? '-' : '+'
-  const amtColor = isExpense ? 'var(--color-expense)' : 'var(--color-income)'
+  const amtColor = isExpense ? 'var(--color-expense-text)' : 'var(--color-income-text)'
 
   const x = useMotionValue(0)
   const isOpen = useRef(false)

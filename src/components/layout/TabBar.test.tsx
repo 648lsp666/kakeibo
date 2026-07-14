@@ -20,3 +20,12 @@ it('opens add entry from the central action', async () => {
   await userEvent.click(addButton)
   expect(useAppStore.getState().isAddSheetOpen).toBe(true)
 })
+
+it('uses the contrast-safe small-text token for inactive tab labels', () => {
+  render(<TabBar />)
+
+  expect(screen.getByRole('button', { name: '账单' })).toHaveStyle({ color: 'var(--color-primary-strong)' })
+  for (const label of ['统计', '分类', '设置']) {
+    expect(screen.getByRole('button', { name: label })).toHaveStyle({ color: 'var(--color-text-small)' })
+  }
+})

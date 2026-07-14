@@ -17,7 +17,7 @@ export function DateGroup({ group, categories, onDelete }: Props) {
     <section style={{ marginBottom: 10 }}>
       <header className="transaction-date-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 2px 7px' }}>
         <h2 className="transaction-date-heading__label" style={{ fontSize: 11, fontWeight: 750, color: 'var(--color-text-secondary)' }}>{label}</h2>
-        <span className="transaction-date-heading__total" style={{ fontSize: 11, fontWeight: 750, color: isNeg ? 'var(--color-expense)' : 'var(--color-income)' }}>
+        <span className="transaction-date-heading__total" style={{ fontSize: 11, fontWeight: 750, color: isNeg ? 'var(--color-expense-text)' : 'var(--color-income-text)' }}>
           {isNeg ? '' : '+'}¥{Math.abs(group.total).toFixed(2)}
         </span>
       </header>

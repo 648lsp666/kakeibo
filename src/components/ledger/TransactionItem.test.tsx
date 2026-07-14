@@ -41,3 +41,11 @@ it('uses the contrast-safe small-text token for a manual source badge', () => {
 
   expect(screen.getByText('手动')).toHaveStyle({ color: 'var(--color-text-small)' })
 })
+
+it('uses semantic text tokens for expense and income amounts', () => {
+  const { rerender } = render(<TransactionItem tx={transaction} onDelete={vi.fn()} />)
+  expect(screen.getByText('-¥25.00')).toHaveStyle({ color: 'var(--color-expense-text)' })
+
+  rerender(<TransactionItem tx={{ ...transaction, type: 'income' }} onDelete={vi.fn()} />)
+  expect(screen.getByText('+¥25.00')).toHaveStyle({ color: 'var(--color-income-text)' })
+})
