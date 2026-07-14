@@ -12,6 +12,7 @@ export function CategoryPage() {
   const [showForm, setShowForm] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [formSaving, setFormSaving] = useState(false)
 
   const handleSave = async (data: NewCategoryInput) => {
     await addCategory(data)
@@ -45,7 +46,7 @@ export function CategoryPage() {
 
       <button
         type="button"
-        onClick={() => setShowForm(true)}
+        onClick={() => { setFormSaving(false); setShowForm(true) }}
         className="primary-button"
         style={{ alignItems: 'center', display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16, width: '100%' }}
       >
@@ -58,8 +59,10 @@ export function CategoryPage() {
         title="新建分类"
         description="选择收支类型和图标，再给分类起个名字。"
         onClose={() => setShowForm(false)}
+        closeDisabled={formSaving}
+        busy={formSaving}
       >
-        <CategoryForm onSave={handleSave} onCancel={() => setShowForm(false)} />
+        <CategoryForm onSave={handleSave} onCancel={() => setShowForm(false)} onSavingChange={setFormSaving} />
       </Sheet>
 
       <ConfirmDialog

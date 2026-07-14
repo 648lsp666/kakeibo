@@ -31,9 +31,10 @@ const ICON_LABELS: Record<(typeof CATEGORY_ICON_OPTIONS)[number], string> = {
 interface Props {
   onSave: (data: { name: string; icon: IconName; type: TransactionType }) => void | Promise<void>
   onCancel: () => void
+  onSavingChange?: (saving: boolean) => void
 }
 
-export function CategoryForm({ onSave, onCancel }: Props) {
+export function CategoryForm({ onSave, onCancel, onSavingChange }: Props) {
   const [name, setName] = useState('')
   const [icon, setIcon] = useState<IconName>('category')
   const [type, setType] = useState<TransactionType>('expense')
@@ -53,6 +54,7 @@ export function CategoryForm({ onSave, onCancel }: Props) {
     }
     savingRef.current = true
     setSaving(true)
+    onSavingChange?.(true)
     setSaveError('')
     try {
       await onSave({ name: trimmedName, icon, type })
@@ -61,6 +63,7 @@ export function CategoryForm({ onSave, onCancel }: Props) {
     } finally {
       savingRef.current = false
       setSaving(false)
+      onSavingChange?.(false)
     }
   }
 

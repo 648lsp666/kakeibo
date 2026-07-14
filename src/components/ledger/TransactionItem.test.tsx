@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { expect, it, vi } from 'vitest'
@@ -16,6 +16,15 @@ const transaction: Transaction = {
   source: 'manual',
   createdAt: '2026-07-15T12:00:00.000Z',
   updatedAt: '2026-07-15T12:00:00.000Z',
+}
+
+const olderTransaction: Transaction = {
+  ...transaction,
+  id: 'tx-2',
+  note: '晚餐',
+  date: '2026-07-14',
+  createdAt: '2026-07-14T18:00:00.000Z',
+  updatedAt: '2026-07-14T18:00:00.000Z',
 }
 
 it('fills the 72px swipe reveal area with the delete target', () => {
@@ -90,7 +99,7 @@ it('uses the custom confirmation dialog, cancels without deleting, and restores 
   const user = userEvent.setup()
   const onDelete = vi.fn()
   const nativeConfirm = vi.spyOn(window, 'confirm')
-  render(<TransactionItem tx={transaction} onDelete={onDelete} />)
+  render(<TransactionList transactions={[transaction]} categories={[]} onDelete={onDelete} />)
 
   const trigger = screen.getByRole('button', { name: '删除午餐' })
   trigger.focus()
@@ -107,8 +116,13 @@ it('uses the custom confirmation dialog, cancels without deleting, and restores 
 
 it('confirms deletion once and restores focus after the custom dialog closes', async () => {
   const user = userEvent.setup()
-  const onDelete = vi.fn().mockResolvedValue(undefined)
-  render(<TransactionItem tx={transaction} onDelete={onDelete} />)
+  const onDelete = vi.fn()
+  function RemovingList() {
+    const [transactions, setTransactions] = useState([transaction, olderTransaction])
+    onDelete.mockImplementation(async (id: string) => setTransactions(current => current.filter(tx => tx.id !== id)))
+    return <TransactionList transactions={transactions} categories={[]} onDelete={onDelete} />
+  }
+  render(<RemovingList />)
 
   const trigger = screen.getByRole('button', { name: '删除午餐' })
   await user.click(trigger)
@@ -116,7 +130,7 @@ it('confirms deletion once and restores focus after the custom dialog closes', a
 
   expect(onDelete).toHaveBeenCalledOnce()
   expect(onDelete).toHaveBeenCalledWith(transaction.id)
-  await waitFor(() => expect(trigger).toHaveFocus())
+  await waitFor(() => expect(screen.getByRole('button', { name: '删除晚餐' })).toHaveFocus())
 })
 
 it('moves focus to the ledger region when confirming removes the final item', async () => {
@@ -131,4 +145,79 @@ it('moves focus to the ledger region when confirming removes the final item', as
   await user.click(screen.getByRole('button', { name: '确认删除' }))
 
   await waitFor(() => expect(screen.getByRole('region', { name: '交易记录' })).toHaveFocus())
+})
+
+it('keeps the dialog open, reports delete rejection, and allows retry', async () => {
+  const user = userEvent.setup()
+  const onDelete = vi.fn()
+  let removeTransaction!: () => void
+  onDelete.mockRejectedValueOnce(new Error('数据库不可用'))
+    .mockImplementationOnce(async () => removeTransaction())
+  function RetryList() {
+    const [transactions, setTransactions] = useState([transaction])
+    removeTransaction = () => setTransactions([])
+    return <TransactionList transactions={transactions} categories={[]} onDelete={onDelete} />
+  }
+  render(<RetryList />)
+
+  await user.click(screen.getByRole('button', { name: '删除午餐' }))
+  await user.click(screen.getByRole('button', { name: '确认删除' }))
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('删除失败：数据库不可用')
+  expect(screen.getByRole('dialog', { name: '删除这条记录？' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '确认删除' })).toBeEnabled()
+
+  await user.click(screen.getByRole('button', { name: '确认删除' }))
+  expect(onDelete).toHaveBeenCalledTimes(2)
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+})
+
+it('allows cancel after a rejected delete and restores the trigger focus', async () => {
+  const user = userEvent.setup()
+  render(<TransactionList transactions={[transaction]} categories={[]} onDelete={vi.fn().mockRejectedValue(new Error('失败'))} />)
+
+  const trigger = screen.getByRole('button', { name: '删除午餐' })
+  await user.click(trigger)
+  await user.click(screen.getByRole('button', { name: '确认删除' }))
+  await screen.findByRole('alert')
+  await user.click(screen.getByRole('button', { name: '取消' }))
+
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  await waitFor(() => expect(trigger).toHaveFocus())
+})
+
+it('focuses the adjacent row across date groups after actual removal', async () => {
+  const user = userEvent.setup()
+  function MultiDateList() {
+    const [transactions, setTransactions] = useState([transaction, olderTransaction])
+    return <TransactionList transactions={transactions} categories={[]} onDelete={async id => setTransactions(current => current.filter(tx => tx.id !== id))} />
+  }
+  render(<MultiDateList />)
+
+  await user.click(screen.getByRole('button', { name: '删除午餐' }))
+  await user.click(screen.getByRole('button', { name: '确认删除' }))
+
+  await waitFor(() => expect(screen.getByRole('button', { name: '删除晚餐' })).toHaveFocus())
+})
+
+it('waits for the flattened transaction props to update before closing and focusing', async () => {
+  const user = userEvent.setup()
+  let resolvePersistence!: () => void
+  let removePersisted!: () => void
+  function DeferredList() {
+    const [transactions, setTransactions] = useState([transaction, olderTransaction])
+    removePersisted = () => setTransactions(current => current.filter(tx => tx.id !== transaction.id))
+    return <TransactionList transactions={transactions} categories={[]} onDelete={() => new Promise<void>(resolve => { resolvePersistence = resolve })} />
+  }
+  render(<DeferredList />)
+
+  await user.click(screen.getByRole('button', { name: '删除午餐' }))
+  await user.click(screen.getByRole('button', { name: '确认删除' }))
+  await act(async () => resolvePersistence())
+
+  await waitFor(() => expect(screen.getByRole('dialog')).toHaveAttribute('aria-busy', 'true'))
+  expect(screen.getByRole('button', { name: '关闭' })).toBeDisabled()
+
+  await act(async () => removePersisted())
+  await waitFor(() => expect(screen.getByRole('button', { name: '删除晚餐' })).toHaveFocus())
 })

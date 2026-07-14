@@ -4,7 +4,7 @@ import { TransactionItem } from './TransactionItem'
 interface Props {
   group: DailyGroup
   categories: Category[]
-  onDelete: (id: string) => void | Promise<void>
+  onDelete: (id: string) => void
 }
 
 export function DateGroup({ group, categories, onDelete }: Props) {

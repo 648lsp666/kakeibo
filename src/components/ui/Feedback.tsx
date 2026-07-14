@@ -93,6 +93,7 @@ export function ConfirmDialog({
   confirmLabel,
   tone = 'primary',
   busy = false,
+  error,
   onConfirm,
   onClose,
 }: {
@@ -102,6 +103,7 @@ export function ConfirmDialog({
   confirmLabel: string
   tone?: 'danger' | 'primary'
   busy?: boolean
+  error?: string
   onConfirm: () => void
   onClose: () => void
 }): React.ReactNode {
@@ -111,6 +113,8 @@ export function ConfirmDialog({
       title={title}
       description={description}
       onClose={onClose}
+      closeDisabled={busy}
+      busy={busy}
       footer={
         <div style={{ display: 'flex', gap: 10 }}>
           <button
@@ -136,7 +140,7 @@ export function ConfirmDialog({
         </div>
       }
     >
-      {null}
+      {error ? <InlineNotice tone="error">{error}</InlineNotice> : null}
     </Sheet>
   )
 }
