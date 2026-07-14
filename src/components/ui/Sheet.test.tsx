@@ -75,3 +75,13 @@ it('keeps the existing spring and fade motion by default', () => {
     transition: { type: 'spring', damping: 30, stiffness: 300 },
   })
 })
+
+it('uses the semantic small-text token for the description', () => {
+  motionMock.reducedMotion.mockReturnValue(false)
+
+  render(<Sheet open title="测试" description="说明文字" onClose={() => undefined}>内容</Sheet>)
+
+  expect(screen.getByText('说明文字')).toHaveStyle({
+    color: 'var(--color-text-small)',
+  })
+})

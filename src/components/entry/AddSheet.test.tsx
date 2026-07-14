@@ -83,3 +83,11 @@ it('uses the semantic small-text token for entry labels', () => {
   expect(screen.getByText('日期')).toHaveStyle({ color: 'var(--color-text-small)' })
   expect(screen.getByText('餐饮')).toHaveStyle({ color: 'var(--color-text-small)' })
 })
+
+it('uses the semantic small-text token for the unselected transaction type', () => {
+  render(<AddSheet />)
+
+  expect(screen.getByRole('button', { name: '收入' })).toHaveStyle({
+    color: 'var(--color-text-small)',
+  })
+})

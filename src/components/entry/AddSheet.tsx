@@ -75,7 +75,7 @@ export function AddSheet() {
                 background: selected ? 'var(--color-primary)' : 'transparent',
                 border: 'none',
                 borderRadius: 11,
-                color: selected ? 'var(--color-on-primary)' : 'var(--color-text-secondary)',
+                color: selected ? 'var(--color-on-primary)' : 'var(--color-text-small)',
                 cursor: 'pointer',
                 flex: 1,
                 fontSize: 14,

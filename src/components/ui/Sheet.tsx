@@ -83,7 +83,7 @@ export function Sheet({
                 {description && (
                   <p
                     id={descriptionId}
-                    style={{ color: 'var(--color-text-secondary)', fontSize: 13, lineHeight: 1.5, marginTop: 5 }}
+                    style={{ color: 'var(--color-text-small)', fontSize: 13, lineHeight: 1.5, marginTop: 5 }}
                   >
                     {description}
                   </p>
