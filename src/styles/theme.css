@@ -5,7 +5,7 @@
   --color-bg-card: #fffdf7;
   --color-bg-elevated: #ffffff;
   --color-text: #344033;
-  --color-text-secondary: #748071;
+  --color-text-secondary: #5f6b5d;
   --color-text-tertiary: #9ca597;
   --color-text-small: #5f6b5d;
   --color-border: #e2e5d8;
@@ -40,7 +40,7 @@
   /* Compatibility aliases for screens migrated in later redesign tasks. */
   --color-bg-list: var(--color-bg-secondary);
   --color-tab-active: var(--color-primary-strong);
-  --color-tab-inactive: var(--color-text-tertiary);
+  --color-tab-inactive: var(--color-text-small);
   --color-fab-bg: var(--color-primary);
   --color-fab-text: var(--color-on-primary);
   --color-header-bg: var(--color-bg-secondary);
@@ -50,7 +50,7 @@
   --color-toggle-inactive: var(--color-bg-secondary);
   --color-input-bg: var(--color-bg-secondary);
   --color-tag-system: var(--color-bg-secondary);
-  --color-tag-system-text: var(--color-text-tertiary);
+  --color-tag-system-text: var(--color-text-small);
   --color-tag-custom: var(--color-primary-soft);
   --color-tag-custom-text: var(--color-primary-strong);
 }

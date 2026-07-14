@@ -15,6 +15,14 @@ it('renders an empty state action', async () => {
   expect(onAction).toHaveBeenCalledOnce()
 })
 
+it('uses the contrast-safe secondary token for empty-state descriptions', () => {
+  render(<EmptyState icon="ledger" title="本月暂无记录" description="记下第一笔收支" />)
+
+  expect(screen.getByText('记下第一笔收支')).toHaveStyle({
+    color: 'var(--color-text-secondary)',
+  })
+})
+
 it('requires explicit confirmation', async () => {
   const onConfirm = vi.fn()
   render(

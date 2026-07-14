@@ -42,6 +42,26 @@ it('uses the contrast-safe small-text token for a manual source badge', () => {
   expect(screen.getByText('手动')).toHaveStyle({ color: 'var(--color-text-small)' })
 })
 
+it('uses the contrast-safe secondary token for the category label', () => {
+  render(
+    <TransactionItem
+      tx={transaction}
+      category={{
+        id: 'food',
+        name: '餐饮',
+        type: 'expense',
+        icon: 'food',
+        isSystem: true,
+        sortOrder: 0,
+        createdAt: '2026-07-15T00:00:00.000Z',
+      }}
+      onDelete={vi.fn()}
+    />,
+  )
+
+  expect(screen.getByText('餐饮')).toHaveStyle({ color: 'var(--color-text-secondary)' })
+})
+
 it('uses semantic text tokens for expense and income amounts', () => {
   const { rerender } = render(<TransactionItem tx={transaction} onDelete={vi.fn()} />)
   expect(screen.getByText('-¥25.00')).toHaveStyle({ color: 'var(--color-expense-text)' })

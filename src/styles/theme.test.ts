@@ -112,8 +112,9 @@ it('keeps Task 8 foreground aliases safe on their actual surfaces in both themes
   expect(themes).toHaveLength(2)
 
   const actualPairs = [
-    ['color-text-small', 'color-bg-card'],
-    ['color-text-small', 'color-bg-secondary'],
+    ...(['color-text-secondary', 'color-text-small'] as const).flatMap((foreground) => (
+      ['color-bg', 'color-bg-card', 'color-bg-elevated', 'color-bg-secondary', 'color-primary-soft'] as const
+    ).map((surface) => [foreground, surface] as const)),
     ['color-income-text', 'color-bg-card'],
     ['color-income-text', 'color-bg-secondary'],
     ['color-income-text', 'color-bg'],
