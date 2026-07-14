@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
 import type { BudgetRule, BudgetPeriod } from '../../types'
+import { InlineNotice } from '../ui/Feedback'
+import { Sheet } from '../ui/Sheet'
 
 interface Props {
   current: BudgetRule | null
@@ -33,27 +34,39 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'flex-end' }}
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        style={{ width: '100%', maxWidth: 430, margin: '0 auto', background: 'var(--color-bg-card)', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--color-text)', marginBottom: 20 }}>
-          {current ? '编辑预算' : '设置预算'}
+    <Sheet
+      open
+      title={current ? '编辑预算' : '设置预算'}
+      description="设置预算金额和统计周期。"
+      onClose={onClose}
+      footer={
+        <div style={{ display: 'flex', gap: 8 }}>
+          {current && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="secondary-button"
+              style={{ borderColor: 'var(--color-expense)', color: 'var(--color-expense)', flexShrink: 0 }}
+            >
+              删除
+            </button>
+          )}
+          <button type="button" onClick={onClose} className="secondary-button" style={{ flex: 1 }}>
+            取消
+          </button>
+          <button type="button" onClick={handleSave} className="primary-button" style={{ flex: 2 }}>
+            保存
+          </button>
         </div>
-
+      }
+    >
         {/* Amount */}
         <div style={fieldWrap}>
-          <div style={fieldLabel}>预算金额</div>
+          <label htmlFor="budget-amount" style={fieldLabel}>预算金额</label>
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 20, fontWeight: 700, color: 'var(--color-text)' }}>¥</span>
             <input
+              id="budget-amount"
               type="number"
               inputMode="decimal"
               value={amount}
@@ -63,7 +76,7 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
                 width: '100%', boxSizing: 'border-box', padding: '12px 14px 12px 34px',
                 fontSize: 22, fontWeight: 800, background: 'var(--color-bg-secondary)',
                 border: '2px solid transparent', borderRadius: 12, color: 'var(--color-text)',
-                outline: 'none', appearance: 'none',
+                appearance: 'none',
               }}
             />
           </div>
@@ -71,11 +84,14 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
 
         {/* Period */}
         <div style={fieldWrap}>
-          <div style={fieldLabel}>预算周期</div>
+          <div id="budget-period-label" style={fieldLabel}>预算周期</div>
           <div style={{ display: 'flex', gap: 8 }}>
             {PERIODS.map(p => (
               <button
                 key={p.id}
+                type="button"
+                aria-pressed={period === p.id}
+                aria-describedby="budget-period-label"
                 onClick={() => setPeriod(p.id)}
                 style={{
                   flex: 1, padding: '10px 0', borderRadius: 12, border: 'none',
@@ -88,7 +104,7 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
               </button>
             ))}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 6 }}>
+          <div style={{ fontSize: 11, color: 'var(--color-text-small)', marginTop: 6 }}>
             {PERIODS.find(p => p.id === period)?.hint}
           </div>
         </div>
@@ -98,36 +114,20 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
           <div style={fieldWrap}>
             <div style={fieldLabel}>日期范围</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={dateInput} />
-              <span style={{ color: 'var(--color-text-tertiary)', fontSize: 13 }}>至</span>
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={dateInput} />
+              <input aria-label="开始日期" type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setError('') }} style={dateInput} />
+              <span style={{ color: 'var(--color-text-small)', fontSize: 13 }}>至</span>
+              <input aria-label="结束日期" type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setError('') }} style={dateInput} />
             </div>
           </div>
         )}
 
         {error && (
-          <div style={{ fontSize: 12, color: '#e11d48', marginBottom: 12, fontWeight: 600 }}>⚠️ {error}</div>
+          <div style={{ marginBottom: 12 }}><InlineNotice tone="error">{error}</InlineNotice></div>
         )}
-
-        {/* Buttons */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-          {current && (
-            <button onClick={onDelete} style={{ padding: '12px 16px', borderRadius: 12, border: 'none', background: '#fee2e2', color: '#e11d48', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-              删除
-            </button>
-          )}
-          <button onClick={onClose} style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: 'none', background: 'var(--color-bg-secondary)', fontSize: 14, fontWeight: 700, color: 'var(--color-text)', cursor: 'pointer' }}>
-            取消
-          </button>
-          <button onClick={handleSave} style={{ flex: 2, padding: '12px 0', borderRadius: 12, border: 'none', background: 'var(--color-tab-active)', fontSize: 14, fontWeight: 800, color: 'var(--color-fab-text)', cursor: 'pointer' }}>
-            保存
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
+    </Sheet>
   )
 }
 
 const fieldWrap: React.CSSProperties = { marginBottom: 18 }
-const fieldLabel: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }
-const dateInput: React.CSSProperties = { flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', background: 'var(--color-bg-secondary)', fontSize: 13, color: 'var(--color-text)', outline: 'none' }
+const fieldLabel: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--color-text-small)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }
+const dateInput: React.CSSProperties = { flex: 1, minWidth: 0, padding: '10px 8px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)', fontSize: 13, color: 'var(--color-text)' }
