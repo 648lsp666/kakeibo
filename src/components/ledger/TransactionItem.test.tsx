@@ -114,6 +114,38 @@ it('uses the custom confirmation dialog, cancels without deleting, and restores 
   nativeConfirm.mockRestore()
 })
 
+it('uses the category name in delete confirmation when the transaction has no note', async () => {
+  const user = userEvent.setup()
+  render(
+    <TransactionList
+      transactions={[{ ...transaction, note: '' }]}
+      categories={[{
+        id: 'food',
+        name: '餐饮',
+        type: 'expense',
+        icon: 'food',
+        isSystem: true,
+        sortOrder: 0,
+        createdAt: '2026-07-01T00:00:00.000Z',
+      }]}
+      onDelete={vi.fn()}
+    />,
+  )
+
+  await user.click(screen.getByRole('button', { name: '删除餐饮' }))
+
+  expect(screen.getByText('确定删除「餐饮」吗？删除后无法恢复。')).toBeInTheDocument()
+})
+
+it('uses the generic record label when neither note nor category is available', async () => {
+  const user = userEvent.setup()
+  render(<TransactionList transactions={[{ ...transaction, note: '', categoryId: 'unknown' }]} categories={[]} onDelete={vi.fn()} />)
+
+  await user.click(screen.getByRole('button', { name: '删除记录' }))
+
+  expect(screen.getByText('确定删除「记录」吗？删除后无法恢复。')).toBeInTheDocument()
+})
+
 it('confirms deletion once and restores focus after the custom dialog closes', async () => {
   const user = userEvent.setup()
   const onDelete = vi.fn()

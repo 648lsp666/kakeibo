@@ -35,7 +35,7 @@ export function TransactionList({ transactions, categories, onDelete }: Props) {
   const containerRef = useRef<HTMLElement>(null)
   const deletingRef = useRef(false)
   const focusAfterCloseRef = useRef<string | null | undefined>(undefined)
-  const [pendingDelete, setPendingDelete] = useState<{ transaction: Transaction; nextFocusId: string | null } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{ transaction: Transaction; label: string; nextFocusId: string | null } | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteCommitted, setDeleteCommitted] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -43,9 +43,11 @@ export function TransactionList({ transactions, categories, onDelete }: Props) {
   const requestDelete = (id: string) => {
     const index = orderedTransactions.findIndex(transaction => transaction.id === id)
     if (index < 0) return
+    const transaction = orderedTransactions[index]
+    const categoryName = categories.find(category => category.id === transaction.categoryId)?.name
     const next = orderedTransactions[index + 1] ?? orderedTransactions[index - 1] ?? null
     setDeleteError('')
-    setPendingDelete({ transaction: orderedTransactions[index], nextFocusId: next?.id ?? null })
+    setPendingDelete({ transaction, label: transaction.note || categoryName || '记录', nextFocusId: next?.id ?? null })
   }
 
   const handleConfirmDelete = async () => {
@@ -126,7 +128,7 @@ export function TransactionList({ transactions, categories, onDelete }: Props) {
         <ConfirmDialog
           open
           title="删除这条记录？"
-          description={`确定删除「${pendingDelete.transaction.note || '记录'}」吗？删除后无法恢复。`}
+          description={`确定删除「${pendingDelete.label}」吗？删除后无法恢复。`}
           confirmLabel={deleting ? '删除中…' : '确认删除'}
           tone="danger"
           busy={deleting}
