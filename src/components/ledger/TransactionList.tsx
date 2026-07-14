@@ -7,7 +7,7 @@ import { useAppStore } from '../../store/appStore'
 interface Props {
   transactions: Transaction[]
   categories: Category[]
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void | Promise<void>
 }
 
 function groupByDate(txs: Transaction[]): DailyGroup[] {
@@ -32,7 +32,7 @@ export function TransactionList({ transactions, categories, onDelete }: Props) {
 
   if (groups.length === 0) {
     return (
-      <div style={{ flex: 1, display: 'grid', placeItems: 'center' }}>
+      <div role="region" aria-label="交易记录" data-ledger-focus-target tabIndex={-1} style={{ flex: 1, display: 'grid', placeItems: 'center' }}>
         <EmptyState
           icon="ledger"
           title="本月还没有记录"

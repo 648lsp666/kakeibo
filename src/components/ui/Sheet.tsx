@@ -19,6 +19,8 @@ export interface SheetProps {
   children: React.ReactNode
   footer?: React.ReactNode
   zIndex?: number
+  closeDisabled?: boolean
+  busy?: boolean
 }
 
 export function Sheet({
@@ -29,6 +31,8 @@ export function Sheet({
   children,
   footer,
   zIndex = 200,
+  closeDisabled = false,
+  busy = false,
 }: SheetProps): React.ReactNode {
   const titleId = useId()
   const descriptionId = useId()
@@ -57,7 +61,7 @@ export function Sheet({
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
-      onClose()
+      if (!closeDisabled) onClose()
       return
     }
 
@@ -94,7 +98,7 @@ export function Sheet({
           animate={shouldReduceMotion ? undefined : { opacity: 1 }}
           exit={shouldReduceMotion ? undefined : { opacity: 0 }}
           transition={shouldReduceMotion ? undefined : { duration: 0.2 }}
-          onClick={onClose}
+          onClick={() => { if (!closeDisabled) onClose() }}
           style={{
             alignItems: 'flex-end',
             background: 'var(--color-overlay)',
@@ -110,6 +114,7 @@ export function Sheet({
             aria-modal="true"
             aria-labelledby={titleId}
             aria-describedby={description ? descriptionId : undefined}
+            aria-busy={busy}
             tabIndex={-1}
             initial={shouldReduceMotion ? undefined : { y: '100%' }}
             animate={shouldReduceMotion ? undefined : { y: 0 }}
@@ -153,7 +158,7 @@ export function Sheet({
                   </p>
                 )}
               </div>
-              <button type="button" className="icon-button" aria-label="关闭" onClick={onClose}>
+              <button type="button" className="icon-button" aria-label="关闭" disabled={closeDisabled} onClick={onClose}>
                 <Icon name="close" />
               </button>
             </header>

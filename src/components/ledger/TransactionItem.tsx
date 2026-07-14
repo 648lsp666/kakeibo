@@ -1,12 +1,14 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, useMotionValue, animate } from 'framer-motion'
 import type { Transaction, Category } from '../../types'
 import { Icon, categoryIconName } from '../ui/Icon'
+import { ConfirmDialog } from '../ui/Feedback'
 
 interface Props {
   tx: Transaction
   category?: Category
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void | Promise<void>
 }
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -32,6 +34,11 @@ export function TransactionItem({ tx, category, onDelete }: Props) {
 
   const x = useMotionValue(0)
   const isOpen = useRef(false)
+  const deletingRef = useRef(false)
+  const deleteTriggerRef = useRef<HTMLButtonElement>(null)
+  const [confirming, setConfirming] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const itemLabel = tx.note || category?.name || '记录'
 
   const snapTo = (target: number) => {
     animate(x, target, { type: 'spring', stiffness: 400, damping: 35 })
@@ -45,7 +52,31 @@ export function TransactionItem({ tx, category, onDelete }: Props) {
   const srcLabel = SOURCE_LABEL[tx.source] ?? tx.source
   const srcStyle = SOURCE_STYLE[tx.source] ?? SOURCE_STYLE.manual
 
+  const requestDelete = () => setConfirming(true)
+  const handleDelete = async () => {
+    if (deletingRef.current) return
+    deletingRef.current = true
+    setDeleting(true)
+    const row = deleteTriggerRef.current?.closest('li')
+    const adjacentFocusTarget = (row?.nextElementSibling ?? row?.previousElementSibling)
+      ?.querySelector<HTMLElement>('button[aria-label^="删除"]') ?? null
+    try {
+      await onDelete(tx.id)
+      setConfirming(false)
+      window.setTimeout(() => {
+        const focusTarget = adjacentFocusTarget?.isConnected
+          ? adjacentFocusTarget
+          : document.querySelector<HTMLElement>('[data-ledger-focus-target]')
+        focusTarget?.focus()
+      }, 0)
+    } finally {
+      deletingRef.current = false
+      setDeleting(false)
+    }
+  }
+
   return (
+    <>
     <li style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--color-border)' }}>
       {/* Delete button revealed on left swipe */}
       <div style={{
@@ -54,9 +85,11 @@ export function TransactionItem({ tx, category, onDelete }: Props) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <button
+          ref={deleteTriggerRef}
           type="button"
-          aria-label="删除记录"
-          onClick={() => { if (confirm('删除这条记录？')) onDelete(tx.id) }}
+          aria-label={`滑动删除${itemLabel}`}
+          tabIndex={-1}
+          onClick={requestDelete}
           style={{ width: '100%', height: '100%', color: 'var(--color-on-danger)', background: 'none', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 10px', lineHeight: 1.4, textAlign: 'center', display: 'grid', justifyItems: 'center', alignContent: 'center', gap: 3 }}
         >
           <Icon name="trash" size={18} />
@@ -99,7 +132,30 @@ export function TransactionItem({ tx, category, onDelete }: Props) {
         <div style={{ fontSize: 15, fontWeight: 800, color: amtColor, flexShrink: 0 }}>
           {sign}¥{tx.amount.toFixed(2)}
         </div>
+        <button
+          type="button"
+          aria-label={`删除${itemLabel}`}
+          onClick={(event) => { event.stopPropagation(); requestDelete() }}
+          className="icon-button"
+          style={{ color: 'var(--color-text-secondary)', flexShrink: 0 }}
+        >
+          <Icon name="trash" size={17} />
+        </button>
       </motion.div>
     </li>
+    {confirming && createPortal(
+      <ConfirmDialog
+        open
+        title="删除这条记录？"
+        description={`确定删除「${itemLabel}」吗？删除后无法恢复。`}
+        confirmLabel={deleting ? '删除中…' : '确认删除'}
+        tone="danger"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onClose={() => setConfirming(false)}
+      />,
+      document.body,
+    )}
+    </>
   )
 }

@@ -37,13 +37,20 @@ export function LedgerPage() {
   }
 
   const handleConfirm = async () => {
-    if (!preview) return
+    if (!preview || importing) return
     setImporting(true)
-    const result = await importTransactions(preview.txs)
-    setImporting(false)
-    setPreview(null)
-    setImportMsg(`导入完成：新增 ${result.added} 条，跳过重复 ${result.skipped} 条`)
-    setTimeout(() => setImportMsg(''), 4000)
+    setImportError('')
+    try {
+      const result = await importTransactions(preview.txs)
+      setPreview(null)
+      setImportMsg(`导入完成：新增 ${result.added} 条，跳过重复 ${result.skipped} 条`)
+      setTimeout(() => setImportMsg(''), 4000)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '请稍后重试'
+      setImportError(`导入失败：${message}`)
+    } finally {
+      setImporting(false)
+    }
   }
 
   const importButton = (
@@ -67,7 +74,7 @@ export function LedgerPage() {
         onPickMonth={() => setShowPicker(true)}
       />
 
-      {(importMsg || importError) && (
+      {(importMsg || (importError && !preview)) && (
         <div style={{ margin: '10px 16px 0' }}>
           {importMsg && <InlineNotice tone="success">{importMsg}</InlineNotice>}
           {importError && <InlineNotice tone="error">{importError}</InlineNotice>}
@@ -84,6 +91,7 @@ export function LedgerPage() {
           onConfirm={handleConfirm}
           onCancel={() => setPreview(null)}
           importing={importing}
+          error={importError}
         />
       )}
 

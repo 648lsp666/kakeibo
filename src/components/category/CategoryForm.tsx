@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { TransactionType } from '../../types'
 import { Icon, type IconName } from '../ui/Icon'
 
@@ -29,7 +29,7 @@ const ICON_LABELS: Record<(typeof CATEGORY_ICON_OPTIONS)[number], string> = {
 }
 
 interface Props {
-  onSave: (data: { name: string; icon: IconName; type: TransactionType }) => void
+  onSave: (data: { name: string; icon: IconName; type: TransactionType }) => void | Promise<void>
   onCancel: () => void
 }
 
@@ -37,19 +37,35 @@ export function CategoryForm({ onSave, onCancel }: Props) {
   const [name, setName] = useState('')
   const [icon, setIcon] = useState<IconName>('category')
   const [type, setType] = useState<TransactionType>('expense')
-  const [error, setError] = useState('')
+  const [validationError, setValidationError] = useState('')
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
+  const nameRef = useRef<HTMLInputElement>(null)
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (savingRef.current) return
     const trimmedName = name.trim()
     if (!trimmedName) {
-      setError('请输入分类名称')
+      setValidationError('请输入分类名称')
+      nameRef.current?.focus()
       return
     }
-    onSave({ name: trimmedName, icon, type })
+    savingRef.current = true
+    setSaving(true)
+    setSaveError('')
+    try {
+      await onSave({ name: trimmedName, icon, type })
+    } catch {
+      setSaveError('保存失败，请稍后重试')
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
   }
 
   return (
-    <div>
+    <div aria-busy={saving}>
       <div
         role="group"
         aria-label="分类类型"
@@ -59,6 +75,7 @@ export function CategoryForm({ onSave, onCancel }: Props) {
           <button
             key={optionType}
             type="button"
+            disabled={saving}
             aria-pressed={type === optionType}
             onClick={() => setType(optionType)}
             style={{
@@ -88,6 +105,7 @@ export function CategoryForm({ onSave, onCancel }: Props) {
           <button
             key={optionIcon}
             type="button"
+            disabled={saving}
             aria-label={`${ICON_LABELS[optionIcon]}图标`}
             aria-pressed={icon === optionIcon}
             onClick={() => setIcon(optionIcon)}
@@ -111,21 +129,24 @@ export function CategoryForm({ onSave, onCancel }: Props) {
 
       <label htmlFor="category-name" style={fieldLabel}>分类名称</label>
       <input
+        ref={nameRef}
         id="category-name"
         value={name}
         onChange={(event) => {
           setName(event.target.value)
-          setError('')
+          setValidationError('')
+          setSaveError('')
         }}
         placeholder="例如：早餐"
-        aria-invalid={Boolean(error)}
-        aria-describedby={error ? 'category-name-error' : undefined}
+        aria-invalid={Boolean(validationError)}
+        aria-describedby={validationError ? 'category-name-error' : undefined}
+        disabled={saving}
         style={{
           width: '100%',
           boxSizing: 'border-box',
           minHeight: 'var(--tap-size)',
           background: 'var(--color-input-bg)',
-          border: error ? '1px solid var(--color-expense)' : '1px solid var(--color-border)',
+          border: validationError ? '1px solid var(--color-expense)' : '1px solid var(--color-border)',
           borderRadius: 12,
           padding: '12px 14px',
           fontSize: 14,
@@ -133,18 +154,23 @@ export function CategoryForm({ onSave, onCancel }: Props) {
           outline: 'none',
         }}
       />
-      {error && (
+      {validationError && (
         <div id="category-name-error" role="alert" style={{ color: 'var(--color-expense-text)', fontSize: 12, fontWeight: 600, marginTop: 7 }}>
-          {error}
+          {validationError}
+        </div>
+      )}
+      {saveError && (
+        <div role="alert" style={{ color: 'var(--color-expense-text)', fontSize: 12, fontWeight: 600, marginTop: 7 }}>
+          {saveError}
         </div>
       )}
 
       <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-        <button type="button" onClick={onCancel} className="secondary-button" style={{ flex: 1 }}>
+        <button type="button" disabled={saving} onClick={onCancel} className="secondary-button" style={{ flex: 1 }}>
           取消
         </button>
-        <button type="button" aria-label="保存分类" onClick={handleSave} className="primary-button" style={{ flex: 2 }}>
-          保存
+        <button type="button" aria-label={saving ? '保存中…' : '保存分类'} disabled={saving} onClick={handleSave} className="primary-button" style={{ flex: 2 }}>
+          {saving ? '保存中…' : '保存'}
         </button>
       </div>
     </div>

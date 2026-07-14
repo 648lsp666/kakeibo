@@ -9,9 +9,10 @@ interface Props {
   onConfirm: () => void
   onCancel: () => void
   importing: boolean
+  error?: string
 }
 
-export function CSVPreviewSheet({ transactions, source, duplicateIds, onConfirm, onCancel, importing }: Props) {
+export function CSVPreviewSheet({ transactions, source, duplicateIds, onConfirm, onCancel, importing, error }: Props) {
   const label = source === 'wechat' ? '微信' : '支付宝'
   const expenses = transactions.filter((transaction) => transaction.type === 'expense')
   const incomes = transactions.filter((transaction) => transaction.type === 'income')
@@ -23,10 +24,12 @@ export function CSVPreviewSheet({ transactions, source, duplicateIds, onConfirm,
       title={`${label}账单预览`}
       description={`共 ${transactions.length} 条 · 支出 ${expenses.length} 笔 · 收入 ${incomes.length} 笔`}
       onClose={onCancel}
+      closeDisabled={importing}
+      busy={importing}
       zIndex={100}
       footer={
         <div style={{ display: 'flex', gap: 10 }}>
-          <button type="button" className="secondary-button" onClick={onCancel} style={{ flex: 1 }}>
+          <button type="button" className="secondary-button" disabled={importing} onClick={onCancel} style={{ flex: 1 }}>
             取消
           </button>
           <button type="button" className="primary-button" onClick={onConfirm} disabled={importing} style={{ flex: 2, opacity: importing ? 0.6 : 1 }}>
@@ -35,6 +38,11 @@ export function CSVPreviewSheet({ transactions, source, duplicateIds, onConfirm,
         </div>
       }
     >
+      {error && (
+        <div style={{ marginBottom: 12 }}>
+          <InlineNotice tone="error">{error}</InlineNotice>
+        </div>
+      )}
       {duplicateCount > 0 && (
         <div style={{ marginBottom: 12 }}>
           <InlineNotice tone="warning">

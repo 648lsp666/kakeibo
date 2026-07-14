@@ -1,9 +1,13 @@
+import { forwardRef } from 'react'
+
 interface Props {
   value: string
   onChange: (value: string) => void
+  invalid?: boolean
+  describedBy?: string
 }
 
-export function AmountInput({ value, onChange }: Props) {
+export const AmountInput = forwardRef<HTMLDivElement, Props>(function AmountInput({ value, onChange, invalid = false, describedBy }, ref) {
   const handleKey = (key: string) => {
     if (key === 'DEL') {
       onChange(value.slice(0, -1))
@@ -23,7 +27,15 @@ export function AmountInput({ value, onChange }: Props) {
 
   return (
     <div>
-      <div aria-live="polite" style={{ margin: '8px 0 16px', textAlign: 'center' }}>
+      <div
+        ref={ref}
+        tabIndex={-1}
+        aria-label="金额输入"
+        aria-live="polite"
+        aria-invalid={invalid}
+        aria-describedby={describedBy}
+        style={{ margin: '8px 0 16px', textAlign: 'center' }}
+      >
         <div style={{ color: 'var(--color-text-small)', fontSize: 11, fontWeight: 700, letterSpacing: 1.2, marginBottom: 4 }}>金额</div>
         <div style={{ color: 'var(--color-text)', fontSize: 'clamp(36px, 12vw, 52px)', fontWeight: 900, lineHeight: 1.1, overflowWrap: 'anywhere' }}>
           ¥{displayValue}
@@ -65,4 +77,4 @@ export function AmountInput({ value, onChange }: Props) {
       </div>
     </div>
   )
-}
+})

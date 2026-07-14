@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, it, vi } from 'vitest'
 import type { RuleWithStatus } from '../../hooks/useBudget'
@@ -85,4 +85,67 @@ it('uses the expense text token for the setup delete action', () => {
   const deleteButton = screen.getByRole('button', { name: '删除' })
   expect(deleteButton).toHaveStyle({ color: 'var(--color-expense-text)' })
   expect(deleteButton.style.borderColor).toBe('var(--color-expense)')
+})
+
+it('focuses and describes the first invalid budget field', async () => {
+  const user = userEvent.setup()
+  render(<BudgetSetupSheet current={null} onSave={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />)
+
+  await user.click(screen.getByRole('button', { name: '保存' }))
+
+  const amount = screen.getByLabelText('预算金额')
+  expect(amount).toHaveFocus()
+  expect(amount).toHaveAttribute('aria-invalid', 'true')
+  expect(amount).toHaveAttribute('aria-describedby', 'budget-error')
+})
+
+it('focuses and describes the first missing custom date', async () => {
+  const user = userEvent.setup()
+  render(<BudgetSetupSheet current={null} onSave={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />)
+
+  await user.type(screen.getByLabelText('预算金额'), '1000')
+  await user.click(screen.getByRole('button', { name: '自定义' }))
+  await user.click(screen.getByRole('button', { name: '保存' }))
+
+  const start = screen.getByLabelText('开始日期')
+  expect(start).toHaveFocus()
+  expect(start).toHaveAttribute('aria-invalid', 'true')
+  expect(start).toHaveAttribute('aria-describedby', 'budget-error')
+})
+
+it('focuses the end date when the custom range is invalid', async () => {
+  const user = userEvent.setup()
+  render(<BudgetSetupSheet current={null} onSave={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />)
+
+  await user.type(screen.getByLabelText('预算金额'), '1000')
+  await user.click(screen.getByRole('button', { name: '自定义' }))
+  await user.type(screen.getByLabelText('开始日期'), '2026-07-20')
+  await user.type(screen.getByLabelText('结束日期'), '2026-07-10')
+  await user.click(screen.getByRole('button', { name: '保存' }))
+
+  expect(screen.getByLabelText('结束日期')).toHaveFocus()
+  expect(screen.getByLabelText('结束日期')).toHaveAttribute('aria-invalid', 'true')
+})
+
+it('prevents duplicate saves and recovers after rejection', async () => {
+  let rejectSave!: (reason: Error) => void
+  const onSave = vi.fn(() => new Promise<void>((_, reject) => { rejectSave = reject }))
+  const onClose = vi.fn()
+  const user = userEvent.setup()
+  render(<BudgetSetupSheet current={null} onSave={onSave} onDelete={vi.fn()} onClose={onClose} />)
+
+  await user.type(screen.getByLabelText('预算金额'), '1000')
+  await user.dblClick(screen.getByRole('button', { name: '保存' }))
+
+  expect(onSave).toHaveBeenCalledOnce()
+  expect(screen.getByRole('button', { name: '保存中…' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: '取消' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: '关闭' })).toBeDisabled()
+  expect(screen.getByRole('dialog')).toHaveAttribute('aria-busy', 'true')
+
+  rejectSave(new Error('write failed'))
+  expect(await screen.findByRole('alert')).toHaveTextContent('保存失败，请稍后重试')
+  await waitFor(() => expect(screen.getByRole('button', { name: '保存' })).toBeEnabled())
+  expect(screen.getByRole('button', { name: '取消' })).toBeEnabled()
+  expect(onClose).not.toHaveBeenCalled()
 })

@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { BudgetRule, BudgetPeriod } from '../../types'
 import { InlineNotice } from '../ui/Feedback'
 import { Sheet } from '../ui/Sheet'
 
 interface Props {
   current: BudgetRule | null
-  onSave: (b: Omit<BudgetRule, 'id'>) => void
+  onSave: (b: Omit<BudgetRule, 'id'>) => void | Promise<void>
   onDelete: () => void
   onClose: () => void
 }
@@ -22,15 +22,41 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
   const [startDate, setStartDate] = useState(current?.startDate ?? '')
   const [endDate, setEndDate] = useState(current?.endDate ?? '')
   const [error, setError] = useState('')
+  const [invalidField, setInvalidField] = useState<'amount' | 'start' | 'end' | null>(null)
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
+  const amountRef = useRef<HTMLInputElement>(null)
+  const startRef = useRef<HTMLInputElement>(null)
+  const endRef = useRef<HTMLInputElement>(null)
 
-  const handleSave = () => {
+  const showValidation = (message: string, field: 'amount' | 'start' | 'end', target: React.RefObject<HTMLInputElement | null>) => {
+    setError(message)
+    setInvalidField(field)
+    target.current?.focus()
+  }
+
+  const clearError = () => { setError(''); setInvalidField(null) }
+
+  const handleSave = async () => {
+    if (savingRef.current) return
     const amt = parseFloat(amount)
-    if (isNaN(amt) || amt <= 0) { setError('请输入有效金额'); return }
+    if (isNaN(amt) || amt <= 0) { showValidation('请输入有效金额', 'amount', amountRef); return }
     if (period === 'custom') {
-      if (!startDate || !endDate) { setError('请选择开始和结束日期'); return }
-      if (startDate >= endDate) { setError('结束日期须晚于开始日期'); return }
+      if (!startDate) { showValidation('请选择开始日期', 'start', startRef); return }
+      if (!endDate) { showValidation('请选择结束日期', 'end', endRef); return }
+      if (startDate >= endDate) { showValidation('结束日期须晚于开始日期', 'end', endRef); return }
     }
-    onSave({ amount: amt, period, startDate: period === 'custom' ? startDate : undefined, endDate: period === 'custom' ? endDate : undefined })
+    savingRef.current = true
+    setSaving(true)
+    clearError()
+    try {
+      await onSave({ amount: amt, period, startDate: period === 'custom' ? startDate : undefined, endDate: period === 'custom' ? endDate : undefined })
+    } catch {
+      setError('保存失败，请稍后重试')
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
   }
 
   return (
@@ -39,11 +65,14 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
       title={current ? '编辑预算' : '设置预算'}
       description="设置预算金额和统计周期。"
       onClose={onClose}
+      closeDisabled={saving}
+      busy={saving}
       footer={
         <div style={{ display: 'flex', gap: 8 }}>
           {current && (
             <button
               type="button"
+              disabled={saving}
               onClick={onDelete}
               className="secondary-button"
               style={{ borderColor: 'var(--color-expense)', color: 'var(--color-expense-text)', flexShrink: 0 }}
@@ -51,11 +80,11 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
               删除
             </button>
           )}
-          <button type="button" onClick={onClose} className="secondary-button" style={{ flex: 1 }}>
+          <button type="button" disabled={saving} onClick={onClose} className="secondary-button" style={{ flex: 1 }}>
             取消
           </button>
-          <button type="button" onClick={handleSave} className="primary-button" style={{ flex: 2 }}>
-            保存
+          <button type="button" disabled={saving} onClick={handleSave} className="primary-button" style={{ flex: 2 }}>
+            {saving ? '保存中…' : '保存'}
           </button>
         </div>
       }
@@ -66,11 +95,15 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 20, fontWeight: 700, color: 'var(--color-text)' }}>¥</span>
             <input
+              ref={amountRef}
               id="budget-amount"
               type="number"
               inputMode="decimal"
               value={amount}
-              onChange={e => { setAmount(e.target.value); setError('') }}
+              aria-invalid={invalidField === 'amount'}
+              aria-describedby={invalidField === 'amount' ? 'budget-error' : undefined}
+              disabled={saving}
+              onChange={e => { setAmount(e.target.value); clearError() }}
               placeholder="0"
               style={{
                 width: '100%', boxSizing: 'border-box', padding: '12px 14px 12px 34px',
@@ -90,9 +123,10 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
               <button
                 key={p.id}
                 type="button"
+                disabled={saving}
                 aria-pressed={period === p.id}
                 aria-describedby="budget-period-label"
-                onClick={() => setPeriod(p.id)}
+                onClick={() => { setPeriod(p.id); clearError() }}
                 style={{
                   flex: 1, minHeight: 'var(--tap-size)', padding: '10px 0', borderRadius: 12, border: 'none',
                   fontSize: 13, fontWeight: 700, cursor: 'pointer',
@@ -114,15 +148,15 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
           <div style={fieldWrap}>
             <div style={fieldLabel}>日期范围</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input aria-label="开始日期" type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setError('') }} style={dateInput} />
+              <input ref={startRef} aria-label="开始日期" type="date" value={startDate} aria-invalid={invalidField === 'start'} aria-describedby={invalidField === 'start' ? 'budget-error' : undefined} disabled={saving} onChange={e => { setStartDate(e.target.value); clearError() }} style={dateInput} />
               <span style={{ color: 'var(--color-text-small)', fontSize: 13 }}>至</span>
-              <input aria-label="结束日期" type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setError('') }} style={dateInput} />
+              <input ref={endRef} aria-label="结束日期" type="date" value={endDate} aria-invalid={invalidField === 'end'} aria-describedby={invalidField === 'end' ? 'budget-error' : undefined} disabled={saving} onChange={e => { setEndDate(e.target.value); clearError() }} style={dateInput} />
             </div>
           </div>
         )}
 
         {error && (
-          <div style={{ marginBottom: 12 }}><InlineNotice tone="error">{error}</InlineNotice></div>
+          <div id="budget-error" style={{ marginBottom: 12 }}><InlineNotice tone="error">{error}</InlineNotice></div>
         )}
     </Sheet>
   )

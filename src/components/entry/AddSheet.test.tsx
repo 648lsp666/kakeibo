@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { useAppStore } from '../../store/appStore'
@@ -49,6 +49,57 @@ it('shows an inline amount error and does not save zero', async () => {
 
   expect(screen.getByRole('alert')).toHaveTextContent('请输入大于 0 的金额')
   expect(addTransaction).not.toHaveBeenCalled()
+  expect(screen.getByLabelText('金额输入')).toHaveFocus()
+  expect(screen.getByLabelText('金额输入')).toHaveAttribute('aria-invalid', 'true')
+  expect(screen.getByLabelText('金额输入')).toHaveAttribute('aria-describedby', 'add-amount-error')
+})
+
+it('prevents rapid duplicate saves while pending', async () => {
+  let resolveSave!: () => void
+  addTransaction.mockImplementation(() => new Promise<void>((resolve) => { resolveSave = resolve }))
+  const user = userEvent.setup()
+  render(<AddSheet />)
+
+  await user.click(screen.getByRole('button', { name: '2' }))
+  const save = screen.getByRole('button', { name: '保存记录' })
+  await user.dblClick(save)
+
+  expect(addTransaction).toHaveBeenCalledOnce()
+  expect(screen.getByRole('button', { name: '保存中…' })).toBeDisabled()
+  expect(screen.getByRole('dialog')).toHaveAttribute('aria-busy', 'true')
+  expect(screen.getByRole('button', { name: '关闭' })).toBeDisabled()
+
+  resolveSave()
+  await waitFor(() => expect(useAppStore.getState().isAddSheetOpen).toBe(false))
+})
+
+it('recovers after a rejected save and keeps the form open', async () => {
+  addTransaction.mockRejectedValueOnce(new Error('disk full'))
+  const user = userEvent.setup()
+  render(<AddSheet />)
+
+  await user.click(screen.getByRole('button', { name: '3' }))
+  await user.click(screen.getByRole('button', { name: '保存记录' }))
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('保存失败，请稍后重试')
+  expect(screen.getByRole('button', { name: '保存记录' })).toBeEnabled()
+  expect(screen.getByRole('dialog')).toHaveAttribute('aria-busy', 'false')
+  expect(useAppStore.getState().isAddSheetOpen).toBe(true)
+})
+
+it('focuses and describes an empty date after a valid amount', async () => {
+  const user = userEvent.setup()
+  render(<AddSheet />)
+
+  await user.click(screen.getByRole('button', { name: '5' }))
+  await user.clear(screen.getByLabelText('日期'))
+  await user.click(screen.getByRole('button', { name: '保存记录' }))
+
+  const date = screen.getByLabelText('日期')
+  expect(date).toHaveFocus()
+  expect(date).toHaveAttribute('aria-invalid', 'true')
+  expect(date).toHaveAttribute('aria-describedby', 'add-date-error')
+  expect(screen.getByRole('alert')).toHaveTextContent('请选择日期')
 })
 
 it('saves a valid manual expense and closes the sheet', async () => {

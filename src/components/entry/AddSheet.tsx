@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { useTransactions } from '../../hooks/useTransactions'
 import { useCategories } from '../../hooks/useCategories'
@@ -16,28 +16,52 @@ export function AddSheet() {
   const [type, setType] = useState<TransactionType>('expense')
   const [amount, setAmount] = useState('')
   const [amountError, setAmountError] = useState(false)
+  const [dateError, setDateError] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
   const [categoryId, setCategoryId] = useState('sys-food')
   const [note, setNote] = useState('')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const amountRef = useRef<HTMLDivElement>(null)
+  const dateRef = useRef<HTMLInputElement>(null)
+  const savingRef = useRef(false)
 
   const handleAmountChange = (value: string) => {
     setAmount(value)
     setAmountError(false)
+    setSaveError('')
   }
 
   const handleSave = async () => {
+    if (savingRef.current) return
     const num = Math.round(parseFloat(amount) * 100) / 100
     if (!num || num <= 0) {
       setAmountError(true)
+      amountRef.current?.focus()
+      return
+    }
+    if (!date) {
+      setDateError(true)
+      dateRef.current?.focus()
       return
     }
 
-    await addTransaction({ amount: num, type, categoryId, note, date, source: 'manual' })
-    setAmount('')
-    setAmountError(false)
-    setNote('')
-    setCategoryId(type === 'expense' ? 'sys-food' : 'sys-salary')
-    closeAddSheet()
+    savingRef.current = true
+    setSaving(true)
+    setSaveError('')
+    try {
+      await addTransaction({ amount: num, type, categoryId, note, date, source: 'manual' })
+      setAmount('')
+      setAmountError(false)
+      setNote('')
+      setCategoryId(type === 'expense' ? 'sys-food' : 'sys-salary')
+      closeAddSheet()
+    } catch {
+      setSaveError('保存失败，请稍后重试')
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
   }
 
   const handleTypeChange = (newType: TransactionType) => {
@@ -51,10 +75,12 @@ export function AddSheet() {
       title="记一笔"
       description="记录此刻的收入或支出"
       onClose={closeAddSheet}
+      closeDisabled={saving}
+      busy={saving}
       zIndex={100}
       footer={
-        <button type="button" className="primary-button" onClick={handleSave} style={{ width: '100%' }}>
-          保存记录
+        <button type="button" className="primary-button" disabled={saving} onClick={handleSave} style={{ width: '100%' }}>
+          {saving ? '保存中…' : '保存记录'}
         </button>
       }
     >
@@ -89,11 +115,11 @@ export function AddSheet() {
         })}
       </div>
 
-      <AmountInput value={amount} onChange={handleAmountChange} />
+      <AmountInput ref={amountRef} value={amount} onChange={handleAmountChange} invalid={amountError} describedBy={amountError ? 'add-amount-error' : undefined} />
 
       {amountError && (
         <div style={{ marginTop: 12 }}>
-          <InlineNotice tone="error">请输入大于 0 的金额</InlineNotice>
+          <div id="add-amount-error"><InlineNotice tone="error">请输入大于 0 的金额</InlineNotice></div>
         </div>
       )}
 
@@ -113,12 +139,21 @@ export function AddSheet() {
       <label style={{ color: 'var(--color-text-small)', display: 'block', fontSize: 12, fontWeight: 700 }}>
         日期
         <input
+          ref={dateRef}
           type="date"
           value={date}
-          onChange={(event) => setDate(event.target.value)}
+          aria-invalid={dateError}
+          aria-describedby={dateError ? 'add-date-error' : undefined}
+          onChange={(event) => { setDate(event.target.value); setDateError(false); setSaveError('') }}
           style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-control)', color: 'var(--color-text)', display: 'block', fontSize: 14, marginTop: 6, minHeight: 44, padding: '0 14px', width: '100%' }}
         />
       </label>
+      {dateError && (
+        <div id="add-date-error" style={{ marginTop: 12 }}><InlineNotice tone="error">请选择日期</InlineNotice></div>
+      )}
+      {saveError && (
+        <div style={{ marginTop: 12 }}><InlineNotice tone="error">{saveError}</InlineNotice></div>
+      )}
     </Sheet>
   )
 }
