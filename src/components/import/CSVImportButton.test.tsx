@@ -5,8 +5,8 @@ import { CSVImportButton } from './CSVImportButton'
 it('renders an accessible 44px import action with a local icon and supported file types', () => {
   const { container } = render(<CSVImportButton onParsed={vi.fn()} onError={vi.fn()} />)
 
-  const button = screen.getByRole('button', { name: '导入 CSV' })
-  expect(button).toHaveTextContent('导入 CSV')
+  const button = screen.getByRole('button', { name: '导入账单' })
+  expect(button).toHaveTextContent('导入账单')
   expect(button).not.toHaveTextContent('📥')
   expect(button).toHaveStyle({ minHeight: '44px' })
   expect(button).toHaveStyle({ color: 'var(--color-text-small)' })

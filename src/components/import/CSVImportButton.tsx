@@ -54,7 +54,7 @@ export function CSVImportButton({ onParsed, onError }: Props) {
         style={{ background: 'var(--color-tag-system)', color: 'var(--color-text-small)', border: 'none', borderRadius: 10, minHeight: 44, padding: '0 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
       >
         <Icon name="download" size={16} />
-        <span>导入 CSV</span>
+        <span>导入账单</span>
       </button>
     </>
   )
