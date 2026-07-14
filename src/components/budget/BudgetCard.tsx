@@ -14,6 +14,7 @@ export function BudgetCard({ rs, onEdit }: Props) {
   const pctClamped = Math.min(pct, 1)
   const isWarning = !isOver && pct >= 0.8
   const barColor = isOver ? 'var(--color-expense)' : isWarning ? 'var(--color-warning)' : 'var(--color-primary)'
+  const textColor = isOver ? 'var(--color-expense-text)' : isWarning ? 'var(--color-warning-text)' : 'var(--color-primary-text)'
   const statusLabel = isOver ? '已超预算' : isWarning ? '接近预算' : '预算正常'
 
   return (
@@ -32,14 +33,14 @@ export function BudgetCard({ rs, onEdit }: Props) {
       onClick={onEdit}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: isOver ? 'var(--color-expense)' : 'var(--color-text-small)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: textColor, textTransform: 'uppercase', letterSpacing: 0.5 }}>
           {label} · {statusLabel}
         </span>
-        <span style={{ fontSize: 12, fontWeight: 800, color: barColor }}>{Math.round(pct * 100)}%</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: textColor }}>{Math.round(pct * 100)}%</span>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 8 }}>
-        <span style={{ fontSize: 18, fontWeight: 900, color: isOver ? 'var(--color-expense)' : 'var(--color-text)' }}>
+        <span style={{ fontSize: 18, fontWeight: 900, color: isOver ? 'var(--color-expense-text)' : 'var(--color-text)' }}>
           ¥{fmt(spending)}
         </span>
         <span style={{ fontSize: 12, color: 'var(--color-text-small)' }}>/ ¥{fmt(limit)}</span>
@@ -52,7 +53,7 @@ export function BudgetCard({ rs, onEdit }: Props) {
         }} />
       </div>
 
-      <div style={{ fontSize: 11, color: isOver ? 'var(--color-expense)' : 'var(--color-text-small)', fontWeight: isOver ? 700 : 400 }}>
+      <div style={{ fontSize: 11, color: textColor, fontWeight: isOver ? 700 : 400 }}>
         {subLabel}
       </div>
     </button>

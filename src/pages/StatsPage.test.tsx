@@ -23,7 +23,7 @@ vi.mock('../hooks/useBudget', () => ({
   useBudget: () => ({
     rules: [],
     statuses: [],
-    monthlyBudgetAmount: undefined,
+    monthlyBudgetAmount: 100,
     addRule: vi.fn(),
     updateRule: vi.fn(),
     deleteRule: vi.fn(),
@@ -41,4 +41,22 @@ it('shows the current-month summary, six-month trend, and category spending', ()
   expect(screen.getByText('近 6 个月')).toBeInTheDocument()
   expect(screen.getByText('餐饮')).toBeInTheDocument()
   expect(screen.getAllByText('¥128.50')).not.toHaveLength(0)
+})
+
+it('uses semantic accent text tokens while preserving chart accent graphics', () => {
+  render(<StatsPage />)
+
+  expect(screen.getByText('月预算')).toHaveStyle({ color: 'var(--color-warning-text)' })
+  expect(screen.getByText('超预算')).toHaveStyle({ color: 'var(--color-expense-text)' })
+
+  const expenseSummary = screen.getByText('本月支出').nextElementSibling
+  const incomeSummary = screen.getByText('本月收入').nextElementSibling
+  expect(expenseSummary).toHaveStyle({ color: 'var(--color-expense-text)' })
+  expect(incomeSummary).toHaveStyle({ color: 'var(--color-income-text)' })
+
+  expect(screen.getByText('超预算').previousElementSibling).toHaveStyle({
+    background: 'var(--color-expense)',
+  })
+  expect((screen.getByText('月预算').previousElementSibling as HTMLElement).style.borderTop)
+    .toBe('1.5px dashed var(--color-warning)')
 })

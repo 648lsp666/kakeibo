@@ -37,3 +37,33 @@ it('keeps the small-text token at 4.5:1 against Task 4 surfaces in both themes',
     }
   }
 })
+
+it('keeps semantic accent text tokens at 4.5:1 against Task 5 surfaces in both themes', () => {
+  const themes = [...themeCss.matchAll(/:root\s*\{([^}]*)\}/g)].map((match) => match[1])
+  expect(themes).toHaveLength(2)
+
+  const textTokens = [
+    'color-primary-text',
+    'color-expense-text',
+    'color-warning-text',
+    'color-income-text',
+  ]
+  const surfaces = [
+    'color-bg-card',
+    'color-bg-secondary',
+    'color-danger-soft',
+    'color-bg-elevated',
+    'color-primary-soft',
+  ]
+
+  for (const theme of themes) {
+    for (const textToken of textTokens) {
+      for (const surface of surfaces) {
+        expect(
+          contrast(token(theme, textToken), token(theme, surface)),
+          `${textToken} on ${surface}`,
+        ).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  }
+})

@@ -21,7 +21,7 @@ export function BudgetSection() {
           type="button"
           onClick={() => setEditing('new')}
           className="secondary-button"
-          style={{ minHeight: 36, padding: '0 12px', fontSize: 12 }}
+          style={{ minHeight: 'var(--tap-size)', padding: '0 12px', fontSize: 12 }}
         >
           + 添加
         </button>

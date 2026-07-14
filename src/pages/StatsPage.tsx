@@ -57,11 +57,11 @@ export function StatsPage() {
       <section aria-label="本月收支概览" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 12 }}>
         <div className="surface" style={card}>
           <div style={cardLabel}>本月支出</div>
-          <div style={{ ...cardValue, color: 'var(--color-expense)' }}>¥{fmt(totalExpense)}</div>
+          <div style={{ ...cardValue, color: 'var(--color-expense-text)' }}>¥{fmt(totalExpense)}</div>
         </div>
         <div className="surface" style={card}>
           <div style={cardLabel}>本月收入</div>
-          <div style={{ ...cardValue, color: 'var(--color-income)' }}>¥{fmt(totalIncome)}</div>
+          <div style={{ ...cardValue, color: 'var(--color-income-text)' }}>¥{fmt(totalIncome)}</div>
         </div>
         <div className="surface" style={card}>
           <div style={cardLabel}>本月结余</div>
@@ -89,7 +89,7 @@ export function StatsPage() {
             }}>
               <div style={{ flex: 1, borderTop: '1.5px dashed var(--color-warning)', opacity: 0.85 }} />
               <span style={{
-                fontSize: 9, fontWeight: 700, color: 'var(--color-warning)',
+                fontSize: 9, fontWeight: 700, color: 'var(--color-warning-text)',
                 background: 'var(--color-bg-card)', padding: '1px 5px', borderRadius: 4, flexShrink: 0,
               }}>
                 {monthlyBudgetAmount! >= 1000
@@ -114,7 +114,7 @@ export function StatsPage() {
                     {t.expense > 0 && (
                       <span style={{
                         fontSize: 9, fontWeight: 700,
-                        color: isOverBudget ? 'var(--color-expense)' : isCurrent ? 'var(--color-text)' : 'var(--color-text-tertiary)',
+                        color: isOverBudget ? 'var(--color-expense-text)' : isCurrent ? 'var(--color-text)' : 'var(--color-text-small)',
                       }}>
                         {t.expense >= 1000 ? `${(t.expense / 1000).toFixed(1)}k` : Math.round(t.expense)}
                       </span>
@@ -155,13 +155,13 @@ export function StatsPage() {
           {monthlyBudgetAmount != null && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <div style={{ width: 16, height: 0, borderTop: '1.5px dashed var(--color-warning)' }} />
-              <span style={{ fontSize: 10, color: 'var(--color-warning)' }}>月预算</span>
+              <span style={{ fontSize: 10, color: 'var(--color-warning-text)' }}>月预算</span>
             </div>
           )}
           {monthlyTrend.some(t => monthlyBudgetAmount != null && t.expense > monthlyBudgetAmount) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <div style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--color-expense)' }} />
-              <span style={{ fontSize: 10, color: 'var(--color-expense)' }}>超预算</span>
+              <span style={{ fontSize: 10, color: 'var(--color-expense-text)' }}>超预算</span>
             </div>
           )}
         </div>
@@ -187,7 +187,7 @@ export function StatsPage() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 11, color: 'var(--color-text-small)' }}>{Math.round(stat.pct * 100)}%</span>
-                      <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-expense)' }}>¥{fmt(stat.amount)}</span>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-expense-text)' }}>¥{fmt(stat.amount)}</span>
                     </div>
                   </div>
                   <div style={{ height: 5, borderRadius: 3, background: 'var(--color-bg-secondary)', overflow: 'hidden' }}>
@@ -221,7 +221,7 @@ export function StatsPage() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 11, color: 'var(--color-text-small)' }}>{Math.round(stat.pct * 100)}%</span>
-                    <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-expense)' }}>¥{fmt(stat.amount)}</span>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-expense-text)' }}>¥{fmt(stat.amount)}</span>
                   </div>
                 </div>
                 <div style={{ height: 5, borderRadius: 3, background: 'var(--color-bg-secondary)', overflow: 'hidden' }}>

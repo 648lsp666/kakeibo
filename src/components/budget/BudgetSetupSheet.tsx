@@ -46,7 +46,7 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
               type="button"
               onClick={onDelete}
               className="secondary-button"
-              style={{ borderColor: 'var(--color-expense)', color: 'var(--color-expense)', flexShrink: 0 }}
+              style={{ borderColor: 'var(--color-expense)', color: 'var(--color-expense-text)', flexShrink: 0 }}
             >
               删除
             </button>
@@ -94,7 +94,7 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
                 aria-describedby="budget-period-label"
                 onClick={() => setPeriod(p.id)}
                 style={{
-                  flex: 1, padding: '10px 0', borderRadius: 12, border: 'none',
+                  flex: 1, minHeight: 'var(--tap-size)', padding: '10px 0', borderRadius: 12, border: 'none',
                   fontSize: 13, fontWeight: 700, cursor: 'pointer',
                   background: period === p.id ? 'var(--color-tab-active)' : 'var(--color-bg-secondary)',
                   color: period === p.id ? 'var(--color-fab-text)' : 'var(--color-text)',
@@ -130,4 +130,4 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
 
 const fieldWrap: React.CSSProperties = { marginBottom: 18 }
 const fieldLabel: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--color-text-small)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }
-const dateInput: React.CSSProperties = { flex: 1, minWidth: 0, padding: '10px 8px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)', fontSize: 13, color: 'var(--color-text)' }
+const dateInput: React.CSSProperties = { flex: 1, minHeight: 'var(--tap-size)', minWidth: 0, padding: '10px 8px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)', fontSize: 13, color: 'var(--color-text)' }
