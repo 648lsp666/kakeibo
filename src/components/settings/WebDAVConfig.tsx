@@ -5,6 +5,11 @@ import { InlineNotice, type NoticeTone } from '../ui/Feedback'
 import { Icon } from '../ui/Icon'
 
 type SyncStatus = { tone: NoticeTone; message: string } | null
+type ActiveRequest = 'save' | 'upload' | 'download' | null
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : '操作失败，请重试'
+}
 
 export function WebDAVConfig() {
   const [url, setUrl] = useState('')
@@ -12,7 +17,7 @@ export function WebDAVConfig() {
   const [password, setPassword] = useState('')
   const [lastSync, setLastSync] = useState('')
   const [status, setStatus] = useState<SyncStatus>(null)
-  const [activeRequest, setActiveRequest] = useState<'upload' | 'download' | null>(null)
+  const [activeRequest, setActiveRequest] = useState<ActiveRequest>(null)
   const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -36,13 +41,16 @@ export function WebDAVConfig() {
   }
 
   const handleSave = async () => {
+    setActiveRequest('save')
     try {
       await syncConfigOps.set('webdav_url', url)
       await syncConfigOps.set('webdav_username', username)
       await syncConfigOps.set('webdav_password', password)
       showStatus({ tone: 'success', message: '配置已保存' })
-    } catch (e) {
-      showStatus({ tone: 'error', message: (e as Error).message })
+    } catch (error: unknown) {
+      showStatus({ tone: 'error', message: errorMessage(error) })
+    } finally {
+      setActiveRequest(null)
     }
   }
 
@@ -53,8 +61,8 @@ export function WebDAVConfig() {
       await uploadBackup({ url, username, password })
       setLastSync(new Date().toISOString())
       showStatus({ tone: 'success', message: '上传成功' })
-    } catch (e) {
-      showStatus({ tone: 'error', message: (e as Error).message })
+    } catch (error: unknown) {
+      showStatus({ tone: 'error', message: errorMessage(error) })
     } finally {
       setActiveRequest(null)
     }
@@ -67,8 +75,8 @@ export function WebDAVConfig() {
       const r = await downloadAndMerge({ url, username, password })
       setLastSync(new Date().toISOString())
       showStatus({ tone: 'success', message: `同步完成：新增 ${r.added}，更新 ${r.updated}` })
-    } catch (e) {
-      showStatus({ tone: 'error', message: (e as Error).message })
+    } catch (error: unknown) {
+      showStatus({ tone: 'error', message: errorMessage(error) })
     } finally {
       setActiveRequest(null)
     }
@@ -83,7 +91,6 @@ export function WebDAVConfig() {
     padding: '0 14px',
     fontSize: 13,
     color: 'var(--color-text)',
-    outline: 'none',
   }
 
   const btn: React.CSSProperties = {
@@ -98,7 +105,7 @@ export function WebDAVConfig() {
   }
 
   const fieldLabel: React.CSSProperties = {
-    color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 700,
+    color: 'var(--color-text-small)', fontSize: 12, fontWeight: 700,
   }
 
   return (
@@ -117,7 +124,7 @@ export function WebDAVConfig() {
       </div>
       <button type="button" onClick={handleSave} disabled={activeRequest !== null} className="primary-button" style={{ ...btn, width: '100%', marginTop: 14, marginBottom: 10 }}>
         <Icon name="check" size={18} />
-        保存配置
+        {activeRequest === 'save' ? '保存中…' : '保存配置'}
       </button>
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="button" onClick={handleUpload} disabled={activeRequest !== null} className="secondary-button" style={btn}>
@@ -130,7 +137,7 @@ export function WebDAVConfig() {
         </button>
       </div>
       {lastSync && (
-        <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginTop: 8 }}>
+        <div style={{ fontSize: 10, color: 'var(--color-text-small)', marginTop: 8 }}>
           上次同步：{new Date(lastSync).toLocaleString('zh-CN')}
         </div>
       )}

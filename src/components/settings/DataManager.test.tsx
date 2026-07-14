@@ -20,3 +20,11 @@ it('clears transactions only after custom confirmation', async () => {
   expect(mocks.clear).toHaveBeenCalledWith('transactions')
   expect(seedCategories).toHaveBeenCalledOnce()
 })
+
+it('uses contrast-safe text on the destructive action', () => {
+  render(<DataManager />)
+  expect(screen.getByRole('button', { name: '清除所有账单记录' })).toHaveStyle({
+    background: 'var(--color-danger-soft)',
+    color: 'var(--color-expense-text)',
+  })
+})
