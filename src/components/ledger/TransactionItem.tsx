@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { motion, useMotionValue, animate } from 'framer-motion'
 import type { Transaction, Category } from '../../types'
+import { Icon, categoryIconName } from '../ui/Icon'
 
 interface Props {
   tx: Transaction
@@ -45,7 +46,7 @@ export function TransactionItem({ tx, category, onDelete }: Props) {
   const srcStyle = SOURCE_STYLE[tx.source] ?? SOURCE_STYLE.manual
 
   return (
-    <div style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--color-border)' }}>
+    <li style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--color-border)' }}>
       {/* Delete button revealed on left swipe */}
       <div style={{
         position: 'absolute', right: 0, top: 0, bottom: 0, width: DELETE_W,
@@ -53,16 +54,19 @@ export function TransactionItem({ tx, category, onDelete }: Props) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <button
+          type="button"
+          aria-label="删除记录"
           onClick={() => { if (confirm('删除这条记录？')) onDelete(tx.id) }}
-          style={{ color: '#fff', background: 'none', border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: '8px 10px', lineHeight: 1.4, textAlign: 'center' }}
+          style={{ color: '#fff', background: 'none', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 10px', lineHeight: 1.4, textAlign: 'center', display: 'grid', justifyItems: 'center', gap: 3 }}
         >
-          🗑<br />删除
+          <Icon name="trash" size={18} />
+          <span>删除</span>
         </button>
       </div>
 
       {/* Swipeable row */}
       <motion.div
-        style={{ x, position: 'relative', zIndex: 1, background: 'var(--color-bg)', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', touchAction: 'pan-y' }}
+        style={{ x, position: 'relative', zIndex: 1, background: 'var(--color-bg-card)', display: 'flex', alignItems: 'center', gap: 11, padding: '12px 13px', touchAction: 'pan-y' }}
         drag="x"
         dragConstraints={{ left: -DELETE_W, right: 0 }}
         dragElastic={0.05}
@@ -70,12 +74,12 @@ export function TransactionItem({ tx, category, onDelete }: Props) {
         onClick={() => { if (isOpen.current) snapTo(0) }}
       >
         <div style={{
-          width: 38, height: 38, borderRadius: 11,
-          background: 'var(--color-bg-secondary)',
+          width: 40, height: 40, borderRadius: 13,
+          background: 'var(--color-primary-soft)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 19, flexShrink: 0,
+          color: 'var(--color-primary-strong)', flexShrink: 0,
         }}>
-          {category?.emoji ?? '📦'}
+          <Icon name={categoryIconName(category)} size={20} />
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -84,9 +88,9 @@ export function TransactionItem({ tx, category, onDelete }: Props) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
             {category?.name && (
-              <span style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>{category.name}</span>
+              <span style={{ minWidth: 0, maxWidth: '55%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, color: 'var(--color-text-secondary)' }}>{category.name}</span>
             )}
-            <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: srcStyle.bg, color: srcStyle.color, flexShrink: 0 }}>
+            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: srcStyle.bg, color: srcStyle.color, flexShrink: 0 }}>
               {srcLabel}
             </span>
           </div>
@@ -96,6 +100,6 @@ export function TransactionItem({ tx, category, onDelete }: Props) {
           {sign}¥{tx.amount.toFixed(2)}
         </div>
       </motion.div>
-    </div>
+    </li>
   )
 }

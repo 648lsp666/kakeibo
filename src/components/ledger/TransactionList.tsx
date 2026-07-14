@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion'
 import type { Transaction, Category, DailyGroup } from '../../types'
 import { DateGroup } from './DateGroup'
+import { EmptyState } from '../ui/Feedback'
+import { useAppStore } from '../../store/appStore'
 
 interface Props {
   transactions: Transaction[]
@@ -29,26 +31,30 @@ export function TransactionList({ transactions, categories, onDelete }: Props) {
 
   if (groups.length === 0) {
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', fontSize: 13, gap: 8, padding: 32 }}>
-        <span style={{ fontSize: 40 }}>📭</span>
-        <span>本月暂无记录</span>
-        <span style={{ fontSize: 11 }}>点击右下角 + 添加第一笔</span>
+      <div style={{ flex: 1, display: 'grid', placeItems: 'center' }}>
+        <EmptyState
+          icon="ledger"
+          title="本月还没有记录"
+          description="从一笔小花费开始，慢慢记下生活。"
+          actionLabel="记一笔"
+          onAction={useAppStore.getState().openAddSheet}
+        />
       </div>
     )
   }
 
   return (
-    <div style={{ padding: '0 12px', overflowY: 'auto', flex: 1 }}>
+    <ol aria-label="交易记录" style={{ listStyle: 'none', padding: '8px 16px 20px', overflowY: 'auto', flex: 1 }}>
       {groups.map((g, i) => (
-        <motion.div
+        <motion.li
           key={g.date}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.05, duration: 0.2 }}
         >
           <DateGroup group={g} categories={categories} onDelete={onDelete} />
-        </motion.div>
+        </motion.li>
       ))}
-    </div>
+    </ol>
   )
 }
