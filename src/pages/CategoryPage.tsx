@@ -1,45 +1,77 @@
 import { useState } from 'react'
-import { useCategories } from '../hooks/useCategories'
-import { CategoryList } from '../components/category/CategoryList'
 import { CategoryForm } from '../components/category/CategoryForm'
-import type { TransactionType } from '../types'
+import { CategoryList } from '../components/category/CategoryList'
+import { ConfirmDialog } from '../components/ui/Feedback'
+import { Icon } from '../components/ui/Icon'
+import { Sheet } from '../components/ui/Sheet'
+import { useCategories, type NewCategoryInput } from '../hooks/useCategories'
+import type { Category } from '../types'
 
 export function CategoryPage() {
   const { categories, addCategory, deleteCategory } = useCategories()
   const [showForm, setShowForm] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<Category | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
-  const handleSave = async (data: { name: string; emoji: string; type: TransactionType }) => {
+  const handleSave = async (data: NewCategoryInput) => {
     await addCategory(data)
     setShowForm(false)
   }
 
-  return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: 12 }}>
-      <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--color-text)', marginBottom: 16 }}>分类管理</div>
+  const handleDelete = async () => {
+    if (!pendingDelete || pendingDelete.isSystem) return
+    setDeleting(true)
+    try {
+      await deleteCategory(pendingDelete.id)
+      setPendingDelete(null)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
-      <CategoryList categories={categories} type="expense" onDelete={deleteCategory} />
-      <CategoryList categories={categories} type="income" onDelete={deleteCategory} />
+  return (
+    <div className="page-scroll">
+      <header style={{ marginBottom: 20 }}>
+        <h1 style={{ color: 'var(--color-text)', fontSize: 24, fontWeight: 900 }}>分类管理</h1>
+        <p style={{ color: 'var(--color-text-small)', fontSize: 13, lineHeight: 1.6, marginTop: 6 }}>
+          整理收支分类，让每一笔账都清楚易找。
+        </p>
+      </header>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <CategoryList categories={categories} type="expense" onDelete={setPendingDelete} />
+        <CategoryList categories={categories} type="income" onDelete={setPendingDelete} />
+      </div>
 
       <button
+        type="button"
         onClick={() => setShowForm(true)}
-        style={{ width: '100%', marginTop: 4, padding: '12px 0', background: 'transparent', border: '2px dashed var(--color-border)', borderRadius: 12, fontSize: 14, fontWeight: 600, color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+        className="primary-button"
+        style={{ alignItems: 'center', display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16, width: '100%' }}
       >
-        ＋ 新建分类
+        <Icon name="plus" size={18} />
+        新建分类
       </button>
 
-      {showForm && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}
-          onClick={() => setShowForm(false)}
-        >
-          <div
-            style={{ width: '100%', maxWidth: 430, margin: '0 auto' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <CategoryForm onSave={handleSave} onCancel={() => setShowForm(false)} />
-          </div>
-        </div>
-      )}
+      <Sheet
+        open={showForm}
+        title="新建分类"
+        description="选择收支类型和图标，再给分类起个名字。"
+        onClose={() => setShowForm(false)}
+      >
+        <CategoryForm onSave={handleSave} onCancel={() => setShowForm(false)} />
+      </Sheet>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="删除分类？"
+        description={pendingDelete ? `确定删除「${pendingDelete.name}」吗？已有账单不会被删除。` : ''}
+        confirmLabel={deleting ? '删除中…' : '删除'}
+        tone="danger"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onClose={() => setPendingDelete(null)}
+      />
     </div>
   )
 }

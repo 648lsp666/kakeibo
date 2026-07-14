@@ -1,82 +1,160 @@
 import { useState } from 'react'
 import type { TransactionType } from '../../types'
+import { Icon, type IconName } from '../ui/Icon'
 
-const EMOJI_OPTIONS = ['🍜','🛒','🚌','🎮','🏠','💊','📚','📦','☕','🍵','✈️','🎁','💄','🐶','📱','🏋️','🎵','📷']
+const CATEGORY_ICON_OPTIONS = [
+  'food', 'cart', 'transit', 'game', 'home', 'medical', 'book', 'category',
+  'coffee', 'tea', 'plane', 'gift', 'beauty', 'pet', 'phone', 'fitness', 'music', 'camera',
+] as const satisfies readonly IconName[]
+
+const ICON_LABELS: Record<(typeof CATEGORY_ICON_OPTIONS)[number], string> = {
+  food: '餐饮',
+  cart: '购物',
+  transit: '交通',
+  game: '娱乐',
+  home: '居家',
+  medical: '医疗',
+  book: '学习',
+  category: '其他',
+  coffee: '咖啡',
+  tea: '茶饮',
+  plane: '旅行',
+  gift: '礼物',
+  beauty: '美妆',
+  pet: '宠物',
+  phone: '通讯',
+  fitness: '健身',
+  music: '音乐',
+  camera: '摄影',
+}
 
 interface Props {
-  onSave: (data: { name: string; emoji: string; type: TransactionType }) => void
+  onSave: (data: { name: string; icon: IconName; type: TransactionType }) => void
   onCancel: () => void
 }
 
 export function CategoryForm({ onSave, onCancel }: Props) {
   const [name, setName] = useState('')
-  const [emoji, setEmoji] = useState('📦')
+  const [icon, setIcon] = useState<IconName>('category')
   const [type, setType] = useState<TransactionType>('expense')
+  const [error, setError] = useState('')
 
   const handleSave = () => {
-    if (!name.trim()) { alert('请输入分类名称'); return }
-    onSave({ name: name.trim(), emoji, type })
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      setError('请输入分类名称')
+      return
+    }
+    onSave({ name: trimmedName, icon, type })
   }
 
   return (
-    <div style={{ background: 'var(--color-bg-card)', borderRadius: '20px 20px 0 0', padding: 20 }}>
-      <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-text)', marginBottom: 16 }}>新建分类</div>
-
-      <div style={{ display: 'flex', background: 'var(--color-toggle-inactive)', borderRadius: 10, padding: 3, marginBottom: 14 }}>
-        {(['expense', 'income'] as TransactionType[]).map(t => (
+    <div>
+      <div
+        role="group"
+        aria-label="分类类型"
+        style={{ display: 'flex', background: 'var(--color-bg-secondary)', borderRadius: 12, padding: 3, marginBottom: 18 }}
+      >
+        {(['expense', 'income'] as TransactionType[]).map((optionType) => (
           <button
-            key={t}
-            onClick={() => setType(t)}
+            key={optionType}
+            type="button"
+            aria-pressed={type === optionType}
+            onClick={() => setType(optionType)}
             style={{
-              flex: 1, padding: '8px 0',
-              background: type === t ? 'var(--color-toggle-active)' : 'transparent',
-              color: type === t ? 'var(--color-fab-text)' : 'var(--color-text-secondary)',
-              border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              flex: 1,
+              minHeight: 'var(--tap-size)',
+              background: type === optionType ? 'var(--color-primary)' : 'transparent',
+              color: type === optionType ? 'var(--color-on-primary)' : 'var(--color-text)',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
             }}
           >
-            {t === 'expense' ? '支出' : '收入'}
+            {optionType === 'expense' ? '支出' : '收入'}
           </button>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6, marginBottom: 14 }}>
-        {EMOJI_OPTIONS.map(e => (
+      <div id="category-icon-label" style={fieldLabel}>选择图标</div>
+      <div
+        role="group"
+        aria-labelledby="category-icon-label"
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8, marginBottom: 18 }}
+      >
+        {CATEGORY_ICON_OPTIONS.map((optionIcon) => (
           <button
-            key={e}
-            onClick={() => setEmoji(e)}
+            key={optionIcon}
+            type="button"
+            aria-label={`${ICON_LABELS[optionIcon]}图标`}
+            aria-pressed={icon === optionIcon}
+            onClick={() => setIcon(optionIcon)}
             style={{
-              fontSize: 22, padding: '6px 0',
-              background: emoji === e ? 'var(--color-bg-secondary)' : 'transparent',
-              border: emoji === e ? '2px solid var(--color-tab-active)' : '2px solid transparent',
-              borderRadius: 10, cursor: 'pointer',
+              alignItems: 'center',
+              background: icon === optionIcon ? 'var(--color-primary-soft)' : 'var(--color-bg-secondary)',
+              border: icon === optionIcon ? '2px solid var(--color-primary-strong)' : '2px solid transparent',
+              borderRadius: 12,
+              color: icon === optionIcon ? 'var(--color-primary-strong)' : 'var(--color-text)',
+              cursor: 'pointer',
+              display: 'flex',
+              justifyContent: 'center',
+              minHeight: 'var(--tap-size)',
             }}
           >
-            {e}
+            <Icon name={optionIcon} size={20} />
           </button>
         ))}
       </div>
 
+      <label htmlFor="category-name" style={fieldLabel}>分类名称</label>
       <input
-        placeholder="分类名称"
+        id="category-name"
         value={name}
-        onChange={e => setName(e.target.value)}
-        style={{ width: '100%', background: 'var(--color-input-bg)', border: 'none', borderRadius: 10, padding: '12px 14px', fontSize: 14, color: 'var(--color-text)', marginBottom: 14, outline: 'none' }}
+        onChange={(event) => {
+          setName(event.target.value)
+          setError('')
+        }}
+        placeholder="例如：早餐"
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? 'category-name-error' : undefined}
+        style={{
+          width: '100%',
+          boxSizing: 'border-box',
+          minHeight: 'var(--tap-size)',
+          background: 'var(--color-input-bg)',
+          border: error ? '1px solid var(--color-expense)' : '1px solid var(--color-border)',
+          borderRadius: 12,
+          padding: '12px 14px',
+          fontSize: 14,
+          color: 'var(--color-text)',
+          outline: 'none',
+        }}
       />
+      {error && (
+        <div id="category-name-error" role="alert" style={{ color: 'var(--color-expense-text)', fontSize: 12, fontWeight: 600, marginTop: 7 }}>
+          {error}
+        </div>
+      )}
 
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button
-          onClick={onCancel}
-          style={{ flex: 1, padding: '12px 0', background: 'var(--color-bg-secondary)', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700, color: 'var(--color-text)', cursor: 'pointer' }}
-        >
+      <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+        <button type="button" onClick={onCancel} className="secondary-button" style={{ flex: 1 }}>
           取消
         </button>
-        <button
-          onClick={handleSave}
-          style={{ flex: 2, padding: '12px 0', background: 'var(--color-tab-active)', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 800, color: 'var(--color-fab-text)', cursor: 'pointer' }}
-        >
+        <button type="button" aria-label="保存分类" onClick={handleSave} className="primary-button" style={{ flex: 2 }}>
           保存
         </button>
       </div>
     </div>
   )
+}
+
+const fieldLabel: React.CSSProperties = {
+  color: 'var(--color-text-small)',
+  display: 'block',
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: 0.5,
+  marginBottom: 8,
 }
