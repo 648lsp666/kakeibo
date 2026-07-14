@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import type { Transaction, Category, DailyGroup } from '../../types'
 import { DateGroup } from './DateGroup'
 import { EmptyState } from '../ui/Feedback'
@@ -28,6 +28,7 @@ function groupByDate(txs: Transaction[]): DailyGroup[] {
 
 export function TransactionList({ transactions, categories, onDelete }: Props) {
   const groups = groupByDate(transactions)
+  const prefersReducedMotion = useReducedMotion()
 
   if (groups.length === 0) {
     return (
@@ -48,9 +49,9 @@ export function TransactionList({ transactions, categories, onDelete }: Props) {
       {groups.map((g, i) => (
         <motion.li
           key={g.date}
-          initial={{ opacity: 0, y: 12 }}
+          initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.05, duration: 0.2 }}
+          transition={prefersReducedMotion ? undefined : { delay: i * 0.05, duration: 0.2 }}
         >
           <DateGroup group={g} categories={categories} onDelete={onDelete} />
         </motion.li>

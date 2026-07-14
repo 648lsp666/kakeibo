@@ -24,7 +24,7 @@ export function MonthHeader({ yearMonth, summary, importButton, onPrev, onNext, 
           <p style={{ color: 'var(--color-primary-strong)', fontSize: 11, fontWeight: 800, letterSpacing: 1.4, marginBottom: 8 }}>慢慢生活</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <button type="button" aria-label="上个月" onClick={onPrev} style={arrowBtn}><Icon name="chevron-left" size={18} /></button>
-            <button type="button" aria-label={`选择月份，当前为${year}年${month}月`} onClick={onPickMonth} style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 999, minHeight: 36, padding: '0 12px', cursor: 'pointer', fontSize: 12, color: 'var(--color-text)', fontWeight: 750, letterSpacing: 0.4 }}>
+            <button type="button" aria-label={`选择月份，当前为${year}年${month}月`} onClick={onPickMonth} style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 999, minHeight: 44, padding: '0 12px', cursor: 'pointer', fontSize: 12, color: 'var(--color-text)', fontWeight: 750, letterSpacing: 0.4 }}>
               {year}年{month}月
             </button>
             <button type="button" aria-label="下个月" onClick={onNext} style={arrowBtn}><Icon name="chevron-right" size={18} /></button>
@@ -56,8 +56,8 @@ const arrowBtn: React.CSSProperties = {
   padding: 0,
   cursor: 'pointer',
   color: 'var(--color-text-secondary)',
-  minWidth: 36,
-  minHeight: 36,
+  minWidth: 44,
+  minHeight: 44,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
