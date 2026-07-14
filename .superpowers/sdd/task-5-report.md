@@ -58,3 +58,24 @@ Complete.
 - `npx vitest run`: exit 0; 19 files passed, 54 tests passed.
 - `npm run build`: exit 0; TypeScript and Vite build succeeded, 475 modules transformed.
 - `git diff --check`: exit 0; no whitespace errors.
+
+## Selected-period Contrast Remediation (2026-07-15)
+
+### Fix
+
+- Replaced the active `BudgetSetupSheet` period tokens `--color-tab-active` / `--color-fab-text` with the verified semantic pair `--color-primary` / `--color-on-primary`.
+- Left the inactive period tokens and all compatibility/decorative theme aliases unchanged.
+- The selected-period contrast is 4.820:1 in the light theme and 8.365:1 in the dark theme, both above the 4.5:1 requirement.
+
+### TDD Evidence
+
+- Red command: `npx vitest run src/components/budget/BudgetAccessibility.test.tsx src/styles/theme.test.ts`.
+- Red result: exit 1; the component regression expected `--color-primary` / `--color-on-primary` but received `--color-tab-active` / `--color-fab-text`; the theme contrast regression passed.
+- Green result: exit 0; 2 files passed, 8 tests passed after the two-token component change.
+- Regression coverage asserts the exact selected-period component pair and calculates the actual `--color-on-primary` on `--color-primary` ratio from both theme definitions.
+
+### Verification
+
+- `npx vitest run`: exit 0; 19 files passed, 56 tests passed.
+- `npm run build`: exit 0; TypeScript and Vite build succeeded, 475 modules transformed.
+- `git diff --check`: exit 0; no whitespace errors.

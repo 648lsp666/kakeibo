@@ -50,6 +50,15 @@ it('keeps period and custom-date controls on the shared 44px tap-size contract',
   expect(screen.getByLabelText('结束日期')).toHaveStyle({ minHeight: 'var(--tap-size)' })
 })
 
+it('uses the semantic primary pair for the selected budget period', () => {
+  render(<BudgetSetupSheet current={null} onSave={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />)
+
+  expect(screen.getByRole('button', { name: '月预算', pressed: true })).toHaveStyle({
+    background: 'var(--color-primary)',
+    color: 'var(--color-on-primary)',
+  })
+})
+
 it('uses semantic text tokens for normal, warning, and over-budget copy', () => {
   const { rerender } = render(<BudgetCard rs={status()} onEdit={vi.fn()} />)
   expect(screen.getByText('50%')).toHaveStyle({ color: 'var(--color-primary-text)' })

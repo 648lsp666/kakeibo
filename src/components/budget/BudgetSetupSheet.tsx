@@ -96,8 +96,8 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
                 style={{
                   flex: 1, minHeight: 'var(--tap-size)', padding: '10px 0', borderRadius: 12, border: 'none',
                   fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                  background: period === p.id ? 'var(--color-tab-active)' : 'var(--color-bg-secondary)',
-                  color: period === p.id ? 'var(--color-fab-text)' : 'var(--color-text)',
+                  background: period === p.id ? 'var(--color-primary)' : 'var(--color-bg-secondary)',
+                  color: period === p.id ? 'var(--color-on-primary)' : 'var(--color-text)',
                 }}
               >
                 {p.label}

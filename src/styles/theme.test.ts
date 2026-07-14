@@ -67,3 +67,15 @@ it('keeps semantic accent text tokens at 4.5:1 against Task 5 surfaces in both t
     }
   }
 })
+
+it('keeps the selected budget period semantic pair at 4.5:1 in both themes', () => {
+  const themes = [...themeCss.matchAll(/:root\s*\{([^}]*)\}/g)].map((match) => match[1])
+  expect(themes).toHaveLength(2)
+
+  for (const theme of themes) {
+    expect(
+      contrast(token(theme, 'color-on-primary'), token(theme, 'color-primary')),
+      'color-on-primary on color-primary',
+    ).toBeGreaterThanOrEqual(4.5)
+  }
+})
