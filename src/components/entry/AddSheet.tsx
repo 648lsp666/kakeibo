@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 import { useAppStore } from '../../store/appStore'
 import { useTransactions } from '../../hooks/useTransactions'
 import { useCategories } from '../../hooks/useCategories'
+import { InlineNotice } from '../ui/Feedback'
+import { Sheet } from '../ui/Sheet'
 import { AmountInput } from './AmountInput'
 import { CategoryPicker } from './CategoryPicker'
 import type { TransactionType } from '../../types'
@@ -14,15 +15,26 @@ export function AddSheet() {
 
   const [type, setType] = useState<TransactionType>('expense')
   const [amount, setAmount] = useState('')
+  const [amountError, setAmountError] = useState(false)
   const [categoryId, setCategoryId] = useState('sys-food')
   const [note, setNote] = useState('')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
 
+  const handleAmountChange = (value: string) => {
+    setAmount(value)
+    setAmountError(false)
+  }
+
   const handleSave = async () => {
     const num = Math.round(parseFloat(amount) * 100) / 100
-    if (!num || num <= 0) { alert('请输入金额'); return }
+    if (!num || num <= 0) {
+      setAmountError(true)
+      return
+    }
+
     await addTransaction({ amount: num, type, categoryId, note, date, source: 'manual' })
     setAmount('')
+    setAmountError(false)
     setNote('')
     setCategoryId(type === 'expense' ? 'sys-food' : 'sys-salary')
     closeAddSheet()
@@ -34,71 +46,79 @@ export function AddSheet() {
   }
 
   return (
-    <AnimatePresence>
-      {isAddSheetOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}
-          onClick={closeAddSheet}
-        >
-          <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            style={{ width: '100%', maxWidth: 430, margin: '0 auto', background: 'var(--color-bg-card)', borderRadius: '20px 20px 0 0', padding: 16 }}
-            onClick={e => e.stopPropagation()}
-          >
-            {/* 收支切换 */}
-            <div style={{ display: 'flex', background: 'var(--color-toggle-inactive)', borderRadius: 10, padding: 3, marginBottom: 14 }}>
-              {(['expense', 'income'] as TransactionType[]).map(t => (
-                <button
-                  key={t}
-                  onClick={() => handleTypeChange(t)}
-                  style={{
-                    flex: 1, padding: '9px 0',
-                    background: type === t ? 'var(--color-toggle-active)' : 'transparent',
-                    color: type === t ? 'var(--color-fab-text)' : 'var(--color-text-secondary)',
-                    border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                  }}
-                >
-                  {t === 'expense' ? '支出' : '收入'}
-                </button>
-              ))}
-            </div>
-
-            <AmountInput value={amount} onChange={setAmount} />
-
-            <div style={{ margin: '14px 0' }}>
-              <CategoryPicker categories={categories} type={type} selectedId={categoryId} onSelect={setCategoryId} />
-            </div>
-
-            <input
-              placeholder="✏️ 备注（选填）"
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              style={{ width: '100%', background: 'var(--color-input-bg)', border: 'none', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: 'var(--color-text)', marginBottom: 10, outline: 'none' }}
-            />
-
-            <input
-              type="date"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              style={{ width: '100%', background: 'var(--color-input-bg)', border: 'none', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: 'var(--color-text)', marginBottom: 14, outline: 'none' }}
-            />
-
+    <Sheet
+      open={isAddSheetOpen}
+      title="记一笔"
+      description="记录此刻的收入或支出"
+      onClose={closeAddSheet}
+      zIndex={100}
+      footer={
+        <button type="button" className="primary-button" onClick={handleSave} style={{ width: '100%' }}>
+          保存记录
+        </button>
+      }
+    >
+      <div
+        aria-label="收支类型"
+        role="group"
+        style={{ background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-control)', display: 'flex', marginBottom: 16, padding: 3 }}
+      >
+        {(['expense', 'income'] as TransactionType[]).map((itemType) => {
+          const selected = type === itemType
+          return (
             <button
-              onClick={handleSave}
-              style={{ width: '100%', background: 'var(--color-tab-active)', color: 'var(--color-fab-text)', border: 'none', borderRadius: 14, padding: '15px 0', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}
+              key={itemType}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => handleTypeChange(itemType)}
+              style={{
+                background: selected ? 'var(--color-primary)' : 'transparent',
+                border: 'none',
+                borderRadius: 11,
+                color: selected ? 'var(--color-on-primary)' : 'var(--color-text-secondary)',
+                cursor: 'pointer',
+                flex: 1,
+                fontSize: 14,
+                fontWeight: 700,
+                minHeight: 44,
+              }}
             >
-              保 存
+              {itemType === 'expense' ? '支出' : '收入'}
             </button>
-          </motion.div>
-        </motion.div>
+          )
+        })}
+      </div>
+
+      <AmountInput value={amount} onChange={handleAmountChange} />
+
+      {amountError && (
+        <div style={{ marginTop: 12 }}>
+          <InlineNotice tone="error">请输入大于 0 的金额</InlineNotice>
+        </div>
       )}
-    </AnimatePresence>
+
+      <div style={{ margin: '16px 0' }}>
+        <CategoryPicker categories={categories} type={type} selectedId={categoryId} onSelect={setCategoryId} />
+      </div>
+
+      <label style={{ color: 'var(--color-text-secondary)', display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 12 }}>
+        备注（选填）
+        <input
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-control)', color: 'var(--color-text)', display: 'block', fontSize: 14, marginTop: 6, minHeight: 44, outline: 'none', padding: '0 14px', width: '100%' }}
+        />
+      </label>
+
+      <label style={{ color: 'var(--color-text-secondary)', display: 'block', fontSize: 12, fontWeight: 700 }}>
+        日期
+        <input
+          type="date"
+          value={date}
+          onChange={(event) => setDate(event.target.value)}
+          style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-control)', color: 'var(--color-text)', display: 'block', fontSize: 14, marginTop: 6, minHeight: 44, outline: 'none', padding: '0 14px', width: '100%' }}
+        />
+      </label>
+    </Sheet>
   )
 }
