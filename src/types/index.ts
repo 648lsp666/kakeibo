@@ -1,3 +1,5 @@
+import type { IconName } from '../components/ui/Icon'
+
 export type TransactionType = 'income' | 'expense'
 export type TransactionSource = 'manual' | 'wechat' | 'alipay'
 
@@ -17,7 +19,8 @@ export interface Transaction {
 export interface Category {
   id: string
   name: string
-  emoji: string
+  icon?: IconName
+  emoji?: string
   type: TransactionType
   isSystem: boolean
   sortOrder: number

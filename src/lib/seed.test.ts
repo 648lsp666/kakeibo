@@ -21,11 +21,10 @@ describe('seedCategories', () => {
     expect(cats).toHaveLength(SYSTEM_CATEGORIES.length)
   })
 
-  it('includes 餐饮 with correct emoji', async () => {
+  it('includes 餐饮 with a stable icon name', async () => {
     await seedCategories()
-    const cats = await categoryOps.list()
-    const canteen = cats.find(c => c.name === '餐饮')
-    expect(canteen?.emoji).toBe('🍜')
+    const canteen = (await categoryOps.list()).find(c => c.name === '餐饮')
+    expect(canteen?.icon).toBe('food')
     expect(canteen?.isSystem).toBe(true)
   })
 })
