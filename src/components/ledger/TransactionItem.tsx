@@ -57,7 +57,7 @@ export function TransactionItem({ tx, category, onDelete }: Props) {
           type="button"
           aria-label="删除记录"
           onClick={() => { if (confirm('删除这条记录？')) onDelete(tx.id) }}
-          style={{ color: '#fff', background: 'none', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 10px', lineHeight: 1.4, textAlign: 'center', display: 'grid', justifyItems: 'center', gap: 3 }}
+          style={{ width: '100%', height: '100%', color: '#fff', background: 'none', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 10px', lineHeight: 1.4, textAlign: 'center', display: 'grid', justifyItems: 'center', alignContent: 'center', gap: 3 }}
         >
           <Icon name="trash" size={18} />
           <span>删除</span>
