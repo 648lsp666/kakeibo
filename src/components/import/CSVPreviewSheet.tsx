@@ -62,20 +62,20 @@ export function CSVPreviewSheet({ transactions, source, duplicateIds, onConfirm,
               }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: 'var(--color-text)', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ color: 'var(--color-text-small)', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {transaction.note}
                 </div>
-                <div style={{ color: 'var(--color-text-tertiary)', fontSize: 10, marginTop: 2 }}>
+                <div style={{ color: 'var(--color-text-small)', fontSize: 10, marginTop: 2 }}>
                   {transaction.date}
                 </div>
               </div>
               <div style={{ alignItems: 'center', display: 'flex', flexShrink: 0, gap: 6, marginLeft: 8 }}>
                 {isDuplicate && (
-                  <span style={{ background: 'var(--color-bg-card)', borderRadius: 5, color: 'var(--color-warning)', fontSize: 9, fontWeight: 750, padding: '2px 6px' }}>
+                  <span style={{ background: 'var(--color-bg-card)', borderRadius: 5, color: 'var(--color-text-small)', fontSize: 9, fontWeight: 750, padding: '2px 6px' }}>
                     可能重复
                   </span>
                 )}
-                <span style={{ color: transaction.type === 'expense' ? 'var(--color-expense)' : 'var(--color-income)', fontSize: 12, fontWeight: 750 }}>
+                <span style={{ color: 'var(--color-text-small)', fontSize: 12, fontWeight: 750 }}>
                   {transaction.type === 'expense' ? '-' : '+'}¥{transaction.amount.toFixed(2)}
                 </span>
               </div>
@@ -83,7 +83,7 @@ export function CSVPreviewSheet({ transactions, source, duplicateIds, onConfirm,
           )
         })}
         {transactions.length > 20 && (
-          <div style={{ color: 'var(--color-text-secondary)', fontSize: 12, padding: '10px 0', textAlign: 'center' }}>
+          <div style={{ color: 'var(--color-text-small)', fontSize: 12, padding: '10px 0', textAlign: 'center' }}>
             … 还有 {transactions.length - 20} 条
           </div>
         )}

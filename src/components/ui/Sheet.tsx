@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Icon } from './Icon'
 
 export interface SheetProps {
@@ -23,15 +23,16 @@ export function Sheet({
 }: SheetProps): React.ReactNode {
   const titleId = useId()
   const descriptionId = useId()
+  const shouldReduceMotion = useReducedMotion()
 
   return (
     <AnimatePresence>
       {open && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
+          initial={shouldReduceMotion ? undefined : { opacity: 0 }}
+          animate={shouldReduceMotion ? undefined : { opacity: 1 }}
+          exit={shouldReduceMotion ? undefined : { opacity: 0 }}
+          transition={shouldReduceMotion ? undefined : { duration: 0.2 }}
           onClick={onClose}
           style={{
             alignItems: 'flex-end',
@@ -47,10 +48,10 @@ export function Sheet({
             aria-modal="true"
             aria-labelledby={titleId}
             aria-describedby={description ? descriptionId : undefined}
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+            initial={shouldReduceMotion ? undefined : { y: '100%' }}
+            animate={shouldReduceMotion ? undefined : { y: 0 }}
+            exit={shouldReduceMotion ? undefined : { y: '100%' }}
+            transition={shouldReduceMotion ? undefined : { type: 'spring', damping: 30, stiffness: 300 }}
             onClick={(event) => event.stopPropagation()}
             style={{
               background: 'var(--color-bg-elevated)',

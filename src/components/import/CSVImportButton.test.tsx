@@ -9,6 +9,7 @@ it('renders an accessible 44px import action with a local icon and supported fil
   expect(button).toHaveTextContent('导入 CSV')
   expect(button).not.toHaveTextContent('📥')
   expect(button).toHaveStyle({ minHeight: '44px' })
+  expect(button).toHaveStyle({ color: 'var(--color-text-small)' })
   expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
 
   const input = container.querySelector('input[type="file"]')

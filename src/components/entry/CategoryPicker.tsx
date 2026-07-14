@@ -40,7 +40,7 @@ export function CategoryPicker({ categories, type, selectedId, onSelect }: Props
             >
               <Icon name={categoryIconName(category)} size={18} />
             </span>
-            <span style={{ color: 'var(--color-text)', fontSize: 10, fontWeight: selected ? 750 : 550, marginTop: 4 }}>
+            <span style={{ color: 'var(--color-text-small)', fontSize: 10, fontWeight: selected ? 750 : 550, marginTop: 4 }}>
               {category.name}
             </span>
           </button>

@@ -7,6 +7,7 @@
   --color-text: #344033;
   --color-text-secondary: #748071;
   --color-text-tertiary: #9ca597;
+  --color-text-small: #5f6b5d;
   --color-border: #e2e5d8;
   --color-primary: #718b61;
   --color-on-primary: #12170f;
@@ -52,6 +53,7 @@
     --color-text: #edf1e7;
     --color-text-secondary: #b3bdad;
     --color-text-tertiary: #858f80;
+    --color-text-small: #b3bdad;
     --color-border: #394135;
     --color-primary: #9db88b;
     --color-on-primary: #12170f;

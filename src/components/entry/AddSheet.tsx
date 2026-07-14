@@ -101,22 +101,22 @@ export function AddSheet() {
         <CategoryPicker categories={categories} type={type} selectedId={categoryId} onSelect={setCategoryId} />
       </div>
 
-      <label style={{ color: 'var(--color-text-secondary)', display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 12 }}>
+      <label style={{ color: 'var(--color-text-small)', display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 12 }}>
         备注（选填）
         <input
           value={note}
           onChange={(event) => setNote(event.target.value)}
-          style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-control)', color: 'var(--color-text)', display: 'block', fontSize: 14, marginTop: 6, minHeight: 44, outline: 'none', padding: '0 14px', width: '100%' }}
+          style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-control)', color: 'var(--color-text)', display: 'block', fontSize: 14, marginTop: 6, minHeight: 44, padding: '0 14px', width: '100%' }}
         />
       </label>
 
-      <label style={{ color: 'var(--color-text-secondary)', display: 'block', fontSize: 12, fontWeight: 700 }}>
+      <label style={{ color: 'var(--color-text-small)', display: 'block', fontSize: 12, fontWeight: 700 }}>
         日期
         <input
           type="date"
           value={date}
           onChange={(event) => setDate(event.target.value)}
-          style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-control)', color: 'var(--color-text)', display: 'block', fontSize: 14, marginTop: 6, minHeight: 44, outline: 'none', padding: '0 14px', width: '100%' }}
+          style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-control)', color: 'var(--color-text)', display: 'block', fontSize: 14, marginTop: 6, minHeight: 44, padding: '0 14px', width: '100%' }}
         />
       </label>
     </Sheet>

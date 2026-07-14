@@ -67,3 +67,19 @@ it('saves a valid manual expense and closes the sheet', async () => {
   }))
   expect(useAppStore.getState().isAddSheetOpen).toBe(false)
 })
+
+it('keeps the global keyboard focus outline available on text inputs', () => {
+  render(<AddSheet />)
+
+  expect(screen.getByLabelText('备注（选填）')).not.toHaveStyle({ outline: 'none' })
+  expect(screen.getByLabelText('日期')).not.toHaveStyle({ outline: 'none' })
+})
+
+it('uses the semantic small-text token for entry labels', () => {
+  render(<AddSheet />)
+
+  expect(screen.getByText('金额')).toHaveStyle({ color: 'var(--color-text-small)' })
+  expect(screen.getByText('备注（选填）')).toHaveStyle({ color: 'var(--color-text-small)' })
+  expect(screen.getByText('日期')).toHaveStyle({ color: 'var(--color-text-small)' })
+  expect(screen.getByText('餐饮')).toHaveStyle({ color: 'var(--color-text-small)' })
+})

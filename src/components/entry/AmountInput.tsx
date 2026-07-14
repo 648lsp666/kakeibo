@@ -24,7 +24,7 @@ export function AmountInput({ value, onChange }: Props) {
   return (
     <div>
       <div aria-live="polite" style={{ margin: '8px 0 16px', textAlign: 'center' }}>
-        <div style={{ color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 700, letterSpacing: 1.2, marginBottom: 4 }}>金额</div>
+        <div style={{ color: 'var(--color-text-small)', fontSize: 11, fontWeight: 700, letterSpacing: 1.2, marginBottom: 4 }}>金额</div>
         <div style={{ color: 'var(--color-text)', fontSize: 'clamp(36px, 12vw, 52px)', fontWeight: 900, lineHeight: 1.1, overflowWrap: 'anywhere' }}>
           ¥{displayValue}
         </div>
