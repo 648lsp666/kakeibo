@@ -258,6 +258,88 @@ describe('foreground sync engine', () => {
     expect(unsubscribe).toHaveBeenCalledOnce()
   })
 
+  it('cleans up a failed subscription setup and can start again', async () => {
+    const unsubscribe = vi.fn().mockResolvedValue(undefined)
+    const remote = transport({
+      subscribe: vi.fn()
+        .mockRejectedValueOnce(new SyncTransportError('setup failed', 'transient', 503))
+        .mockResolvedValueOnce(unsubscribe),
+    })
+    const removeOnline = vi.spyOn(window, 'removeEventListener')
+    const removeVisibility = vi.spyOn(document, 'removeEventListener')
+    const engine = createSyncEngine({ userId: 'user-1', workspace: await getWorkspaceSnapshot(), transport: remote, repository: repository(), now: () => now })
+
+    await engine.start()
+    expect(useSyncStore.getState().status).toMatchObject({ kind: 'error', message: 'setup failed' })
+    expect(removeOnline).toHaveBeenCalledWith('online', expect.any(Function))
+    expect(removeVisibility).toHaveBeenCalledWith('visibilitychange', expect.any(Function))
+
+    await engine.start()
+    expect(remote.subscribe).toHaveBeenCalledTimes(2)
+    expect(remote.pullAll).toHaveBeenCalledOnce()
+    await engine.stop()
+    expect(unsubscribe).toHaveBeenCalledOnce()
+  })
+
+  it('keeps a late first-start disposer from overwriting a restarted subscription', async () => {
+    let resolveFirstSubscribe: ((unsubscribe: () => Promise<void>) => void) | undefined
+    const firstUnsubscribe = vi.fn().mockResolvedValue(undefined)
+    const secondUnsubscribe = vi.fn().mockResolvedValue(undefined)
+    const remote = transport({
+      subscribe: vi.fn()
+        .mockImplementationOnce(() => new Promise<() => Promise<void>>(resolve => { resolveFirstSubscribe = resolve }))
+        .mockResolvedValueOnce(secondUnsubscribe),
+    })
+    const engine = createSyncEngine({ userId: 'user-1', workspace: await getWorkspaceSnapshot(), transport: remote, repository: repository(), now: () => now })
+
+    const firstStart = engine.start()
+    await vi.waitFor(() => expect(remote.subscribe).toHaveBeenCalledOnce())
+    await engine.stop()
+    await engine.start()
+    expect(remote.pullAll).toHaveBeenCalledOnce()
+
+    resolveFirstSubscribe?.(firstUnsubscribe)
+    await firstStart
+    expect(firstUnsubscribe).toHaveBeenCalledOnce()
+    expect(secondUnsubscribe).not.toHaveBeenCalled()
+
+    await engine.stop()
+    expect(secondUnsubscribe).toHaveBeenCalledOnce()
+  })
+
+  it('does not schedule a retry after stop while the outbox update is awaiting', async () => {
+    await outboxOps.add(pending('stop-during-update'))
+    const workspace = await getWorkspaceSnapshot()
+    const originalTransaction = workspace.db.transaction.bind(workspace.db)
+    let releaseUpdate: (() => void) | undefined
+    let markUpdateStarted: (() => void) | undefined
+    const updateStarted = new Promise<void>(resolve => { markUpdateStarted = resolve })
+    const updateGate = new Promise<void>(resolve => { releaseUpdate = resolve })
+    vi.spyOn(workspace.db, 'transaction').mockImplementation(((...args: unknown[]) => {
+      const tx = Reflect.apply(originalTransaction, workspace.db, args)
+      if (args[0] !== 'outbox' || args[1] !== 'readwrite') return tx
+      markUpdateStarted?.()
+      const done = tx.done.then(async () => updateGate)
+      return new Proxy(tx, {
+        get(target, property) {
+          if (property === 'done') return done
+          const value = Reflect.get(target, property, target)
+          return typeof value === 'function' ? value.bind(target) : value
+        },
+      })
+    }) as never)
+    const remote = transport({ push: vi.fn().mockRejectedValue(new SyncTransportError('retry', 'transient', 503)) })
+    const engine = createSyncEngine({ userId: 'user-1', workspace, transport: remote, repository: repository(), now: () => now, random: () => 0 })
+    const starting = engine.start()
+    await updateStarted
+    const retryTimer = vi.spyOn(globalThis, 'setTimeout')
+    const stopping = engine.stop()
+    releaseUpdate?.()
+    await Promise.all([starting, stopping])
+
+    expect(retryTimer).not.toHaveBeenCalledWith(expect.any(Function), 2_000)
+  })
+
   it('coalesces duplicate wakes without concurrent loops', async () => {
     let active = 0
     let maximum = 0

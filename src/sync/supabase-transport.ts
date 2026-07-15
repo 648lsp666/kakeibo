@@ -33,6 +33,14 @@ const resultStatuses = new Set<OperationResult['status']>([
   'rejected_deleted',
 ])
 
+const categoryIcons = new Set([
+  'ledger', 'chart', 'category', 'settings', 'plus', 'close', 'chevron-left',
+  'chevron-right', 'download', 'upload', 'cloud', 'database', 'trash', 'warning',
+  'check', 'info', 'calendar', 'target', 'wallet', 'food', 'cart', 'transit',
+  'game', 'home', 'medical', 'book', 'briefcase', 'coins', 'gift', 'coffee',
+  'tea', 'plane', 'beauty', 'pet', 'phone', 'fitness', 'music', 'camera', 'more',
+])
+
 function protocol(message: string): SyncTransportError {
   return new SyncTransportError(`Invalid sync ${message}`, 'protocol')
 }
@@ -52,13 +60,71 @@ function timestamp(value: unknown, label: string, nullable = false): string | nu
   return value
 }
 
-function payload(value: unknown, entityId: string, deletedAt: string | null): SyncPayload | null {
+function isString(value: unknown): value is string {
+  return typeof value === 'string'
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function isDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [year, month, day] = value.split('-').map(Number)
+  const parsed = new Date(Date.UTC(year, month - 1, day))
+  return parsed.getUTCFullYear() === year
+    && parsed.getUTCMonth() === month - 1
+    && parsed.getUTCDate() === day
+}
+
+function isTimestamp(value: unknown): value is string {
+  return typeof value === 'string' && Number.isFinite(Date.parse(value))
+}
+
+function hasOptionalString(value: Record<string, unknown>, key: string): boolean {
+  return value[key] === undefined || typeof value[key] === 'string'
+}
+
+function validPayload(value: Record<string, unknown>, entityType: EntityType): boolean {
+  if (entityType === 'transaction') {
+    return isFiniteNumber(value.amount)
+      && (value.type === 'income' || value.type === 'expense')
+      && isString(value.categoryId)
+      && isString(value.note)
+      && isDate(value.date)
+      && (value.source === 'manual' || value.source === 'wechat' || value.source === 'alipay')
+      && hasOptionalString(value, 'externalId')
+      && isTimestamp(value.createdAt)
+      && isTimestamp(value.updatedAt)
+  }
+  if (entityType === 'category') {
+    return isString(value.name)
+      && (value.icon === undefined || (isString(value.icon) && categoryIcons.has(value.icon)))
+      && hasOptionalString(value, 'emoji')
+      && (value.type === 'income' || value.type === 'expense')
+      && typeof value.isSystem === 'boolean'
+      && isFiniteNumber(value.sortOrder)
+      && isTimestamp(value.createdAt)
+  }
+  return isFiniteNumber(value.amount)
+    && (value.period === 'monthly' || value.period === 'yearly' || value.period === 'custom')
+    && (value.startDate === undefined || isDate(value.startDate))
+    && (value.endDate === undefined || isDate(value.endDate))
+}
+
+function payload(
+  value: unknown,
+  entityType: EntityType,
+  entityId: string,
+  deletedAt: string | null,
+): SyncPayload | null {
   if (value === null) {
     if (deletedAt === null) throw protocol('payload')
     return null
   }
   if (!isObject(value)) throw protocol('payload')
   if (value.id !== entityId) throw protocol('payload ID')
+  if (!validPayload(value, entityType)) throw protocol(`${entityType} payload`)
   return value as unknown as SyncPayload
 }
 
@@ -69,7 +135,7 @@ function cloudRecord(row: unknown, entityType: EntityType): CloudRecord {
   return {
     entityType,
     entityId,
-    record: payload(row.payload, entityId, deletedAt),
+    record: payload(row.payload, entityType, entityId, deletedAt),
     updatedAt: timestamp(row.updated_at, 'updated timestamp') as string,
     deletedAt,
   }
@@ -109,6 +175,7 @@ function operationResult(value: unknown, operation: PendingOperation): Operation
   if (value.entity_type !== 'transaction' && value.entity_type !== 'category' && value.entity_type !== 'budget') {
     throw protocol('entity type')
   }
+  if (value.entity_type !== operation.entityType) throw protocol('entity type')
   const entityId = requiredId(value.entity_id, 'entity ID')
   const deletedAt = timestamp(value.deleted_at, 'deleted timestamp', true)
   return {
@@ -116,7 +183,7 @@ function operationResult(value: unknown, operation: PendingOperation): Operation
     status: value.status as OperationResult['status'],
     entityType: value.entity_type,
     entityId,
-    record: payload(value.record, entityId, deletedAt),
+    record: payload(value.record, value.entity_type, entityId, deletedAt),
     updatedAt: timestamp(value.updated_at, 'updated timestamp') as string,
     deletedAt,
   }
@@ -156,17 +223,26 @@ export function createSupabaseTransport(client: SupabaseClient, userId: string):
 
     async subscribe(onWake, onConnection) {
       const channel = client.channel(`sync:${userId}`)
-      for (const [table] of tableEntities) {
-        channel.on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table, filter: `user_id=eq.${userId}` },
-          () => onWake(),
-        )
+      try {
+        for (const [table] of tableEntities) {
+          channel.on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table, filter: `user_id=eq.${userId}` },
+            () => onWake(),
+          )
+        }
+        channel.subscribe(status => {
+          if (status === 'SUBSCRIBED') onConnection(true)
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') onConnection(false)
+        })
+      } catch (error) {
+        try {
+          await client.removeChannel(channel)
+        } catch {
+          // Preserve the setup failure while still attempting channel cleanup.
+        }
+        throw error
       }
-      channel.subscribe(status => {
-        if (status === 'SUBSCRIBED') onConnection(true)
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') onConnection(false)
-      })
       return async () => {
         await client.removeChannel(channel)
       }

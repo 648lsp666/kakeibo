@@ -264,6 +264,25 @@ describe('domain repository cloud application', () => {
     expect((await outboxOps.list()).map(item => item.operationId)).toEqual(['later-duplicate-operation'])
   })
 
+  it('removes the optimistic duplicate when deduplication has no later local intent', async () => {
+    const duplicateLocal = transaction('duplicate-without-later', 'optimistic duplicate')
+    const canonical = transaction('canonical-without-later', 'canonical server row')
+    const db = await getActiveWorkspace()
+    await db.put('transactions', duplicateLocal)
+    await outboxOps.add(pending('deduplicated-without-later', duplicateLocal))
+    const result: OperationResult = {
+      ...cloud(canonical),
+      operationId: 'deduplicated-without-later',
+      status: 'deduplicated',
+    }
+
+    await domainRepository.acknowledgeOperation('deduplicated-without-later', result)
+
+    expect(await db.get('transactions', canonical.id)).toEqual(canonical)
+    expect(await db.get('transactions', duplicateLocal.id)).toBeUndefined()
+    expect(await outboxOps.list()).toEqual([])
+  })
+
   it('rolls back both server application and exact outbox deletion when acknowledgement fails', async () => {
     const before = transaction('ack-rollback', 'before acknowledgement')
     const server = transaction('ack-rollback', 'server result')

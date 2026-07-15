@@ -251,6 +251,7 @@ export function createDomainRepository(options: DomainRepositoryOptions = {}): D
         if (!confirmed) throw new Error(`Pending operation ${operationId} no longer exists`)
         if (confirmed.entityType !== result.entityType) throw new Error('Acknowledgement entity type mismatch')
         const business = tx.objectStore(store)
+        if (confirmed.entityId !== result.entityId) await business.delete(confirmed.entityId)
         if (result.entityType === 'category') {
           if (result.record && (result.record as Category).isSystem) throw new Error('Cloud result cannot replace a system category')
           if (result.deletedAt || !result.record) {

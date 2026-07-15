@@ -14,11 +14,15 @@ const operation: PendingOperation = {
   state: 'pending',
 }
 
-function clientWithRows(overrides: Record<string, unknown> = {}) {
+function clientWithRows(
+  overrides: Record<string, unknown> = {},
+  rowOverrides: Record<string, unknown[]> = {},
+) {
   const rows: Record<string, unknown[]> = {
     transactions: [{ id: 'tx-1', payload: operation.payload, updated_at: '2026-07-15T01:00:00.000Z', deleted_at: null }],
     categories: [{ id: 'cat-1', payload: null, updated_at: '2026-07-15T02:00:00.000Z', deleted_at: '2026-07-15T02:00:00.000Z' }],
     budgets: [{ id: 'budget-1', payload: { id: 'budget-1', amount: 300, period: 'monthly' }, updated_at: '2026-07-15T03:00:00.000Z', deleted_at: null }],
+    ...rowOverrides,
   }
   return {
     from: vi.fn((table: string) => ({ select: vi.fn().mockResolvedValue({ data: rows[table], error: null }) })),
@@ -62,6 +66,71 @@ describe('Supabase sync transport', () => {
   ])('rejects malformed pulled rows (%s)', async (row, message) => {
     const client = clientWithRows({ from: vi.fn(() => ({ select: vi.fn().mockResolvedValue({ data: [row], error: null }) })) })
     await expect(createSupabaseTransport(client as never, 'user-1').pullAll()).rejects.toMatchObject({ kind: 'protocol', message: expect.stringContaining(message) })
+  })
+
+  it.each([
+    ['transactions', 'transaction', { ...(operation.payload as object), id: 'tx-1', note: undefined }],
+    ['categories', 'category', { id: 'cat-invalid', name: 'bad', type: 'expense', isSystem: false, sortOrder: '1', createdAt: '2026-07-15T00:00:00.000Z' }],
+    ['budgets', 'budget', { id: 'budget-invalid', amount: 100, period: 'weekly' }],
+  ])('rejects invalid %s payload shapes from pull', async (table, _entityType, invalidPayload) => {
+    const id = String(invalidPayload.id)
+    const client = clientWithRows({}, {
+      [table]: [{ id, payload: invalidPayload, updated_at: '2026-07-15T01:00:00.000Z', deleted_at: null }],
+    })
+    await expect(createSupabaseTransport(client as never, 'user-1').pullAll()).rejects.toMatchObject({ kind: 'protocol' })
+  })
+
+  it('rejects transaction dates outside YYYY-MM-DD', async () => {
+    const invalidPayload = { ...(operation.payload as object), date: '07/15/2026' }
+    const client = clientWithRows({}, {
+      transactions: [{ id: 'tx-1', payload: invalidPayload, updated_at: '2026-07-15T01:00:00.000Z', deleted_at: null }],
+    })
+    await expect(createSupabaseTransport(client as never, 'user-1').pullAll()).rejects.toMatchObject({ kind: 'protocol' })
+  })
+
+  it.each([
+    ['transaction', { ...(operation.payload as object), id: 'tx-1', amount: '12' }],
+    ['category', { id: 'cat-push', name: 'bad', type: 'expense', isSystem: 'false', sortOrder: 1, createdAt: '2026-07-15T00:00:00.000Z' }],
+    ['budget', { id: 'budget-push', amount: null, period: 'monthly' }],
+  ] as const)('rejects invalid %s payload shapes from push results', async (entityType, invalidPayload) => {
+    const pendingOperation: PendingOperation = {
+      ...operation,
+      entityType,
+      entityId: String(invalidPayload.id),
+      payload: invalidPayload as never,
+    }
+    const client = clientWithRows({ rpc: vi.fn().mockResolvedValue({
+      data: {
+        operation_id: 'op-1', status: 'applied', entity_type: entityType,
+        entity_id: invalidPayload.id, record: invalidPayload,
+        updated_at: '2026-07-15T04:00:00.000Z', deleted_at: null,
+      },
+      error: null,
+    }) })
+    await expect(createSupabaseTransport(client as never, 'user-1').push(pendingOperation)).rejects.toMatchObject({ kind: 'protocol' })
+  })
+
+  it('rejects a push result whose entity type differs from the requested operation', async () => {
+    const client = clientWithRows({ rpc: vi.fn().mockResolvedValue({
+      data: {
+        operation_id: 'op-1', status: 'applied', entity_type: 'budget', entity_id: 'tx-1',
+        record: { id: 'tx-1', amount: 100, period: 'monthly' },
+        updated_at: '2026-07-15T04:00:00.000Z', deleted_at: null,
+      },
+      error: null,
+    }) })
+    await expect(createSupabaseTransport(client as never, 'user-1').push(operation)).rejects.toMatchObject({ kind: 'protocol' })
+  })
+
+  it('rejects category icon values outside the IconName enum', async () => {
+    const invalidPayload = {
+      id: 'cat-invalid-icon', name: 'bad icon', icon: 'not-an-icon', type: 'expense',
+      isSystem: false, sortOrder: 1, createdAt: '2026-07-15T00:00:00.000Z',
+    }
+    const client = clientWithRows({}, {
+      categories: [{ id: invalidPayload.id, payload: invalidPayload, updated_at: '2026-07-15T01:00:00.000Z', deleted_at: null }],
+    })
+    await expect(createSupabaseTransport(client as never, 'user-1').pullAll()).rejects.toMatchObject({ kind: 'protocol' })
   })
 
   it.each([
@@ -112,6 +181,26 @@ describe('Supabase sync transport', () => {
     expect(connections.mock.calls).toEqual([[true], [false]])
 
     await unsubscribe()
+    expect(removeChannel).toHaveBeenCalledWith(channel)
+  })
+
+  it.each(['on', 'subscribe'] as const)('removes the channel when Realtime %s setup throws', async failurePoint => {
+    const channel = {
+      on: vi.fn(),
+      subscribe: vi.fn(),
+    }
+    channel.on.mockImplementation(() => {
+      if (failurePoint === 'on') throw new Error('on setup failed')
+      return channel
+    })
+    channel.subscribe.mockImplementation(() => {
+      if (failurePoint === 'subscribe') throw new Error('subscribe setup failed')
+      return channel
+    })
+    const removeChannel = vi.fn().mockResolvedValue('ok')
+    const client = clientWithRows({ channel: vi.fn(() => channel), removeChannel })
+
+    await expect(createSupabaseTransport(client as never, 'user-1').subscribe(vi.fn(), vi.fn())).rejects.toThrow('setup failed')
     expect(removeChannel).toHaveBeenCalledWith(channel)
   })
 })

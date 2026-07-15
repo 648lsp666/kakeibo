@@ -31,8 +31,10 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
   let wakeUnsubscribe: (() => void) | null = null
   let retryTimer: ReturnType<typeof setTimeout> | null = null
   let connectionOnline = typeof navigator === 'undefined' || navigator.onLine
+  let lifecycleGeneration = 0
 
   const isActiveWorkspace = () => running && isWorkspaceCurrent(input.workspace)
+  const ownsLifecycle = (generation: number) => isActiveWorkspace() && lifecycleGeneration === generation
   const setStatus = (status: SyncStatus) => {
     if (isActiveWorkspace()) useSyncStore.getState().setStatus(status)
   }
@@ -62,9 +64,10 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
   }
 
   async function handleRequestError(error: unknown, operation?: PendingOperation): Promise<'continue' | 'stop'> {
-    if (!isActiveWorkspace()) return 'stop'
+    const generation = lifecycleGeneration
+    if (!ownsLifecycle(generation)) return 'stop'
     const pending = await pendingCount()
-    if (!isActiveWorkspace()) return 'stop'
+    if (!ownsLifecycle(generation)) return 'stop'
     if (error instanceof SyncTransportError && error.kind === 'auth') {
       setStatus({ kind: 'auth-required', pending })
       return 'stop'
@@ -75,6 +78,7 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
         state: 'isolated',
         lastError: error.message,
       }))
+      if (!ownsLifecycle(generation)) return 'stop'
       return 'continue'
     }
     if (operation && error instanceof SyncTransportError
@@ -87,9 +91,10 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
         nextAttemptAt: new Date(now().getTime() + delay).toISOString(),
         lastError: error.message,
       }))
+      if (!ownsLifecycle(generation)) return 'stop'
       scheduleRetry(delay)
       const remaining = await pendingCount()
-      if (!isActiveWorkspace()) return 'stop'
+      if (!ownsLifecycle(generation)) return 'stop'
       setStatus(connectionOnline
         ? { kind: 'error', pending: remaining, message: error.message }
         : { kind: 'offline', pending: remaining })
@@ -183,12 +188,20 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
     if (document.visibilityState === 'visible') engine.wake('foreground')
   }
 
+  function removeLocalListeners(): void {
+    wakeUnsubscribe?.()
+    wakeUnsubscribe = null
+    if (typeof window !== 'undefined') window.removeEventListener('online', onlineListener)
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', visibilityListener)
+  }
+
   const engine: SyncEngine = {
     async start() {
       if (running) {
         if (loopPromise) await loopPromise
         return
       }
+      const generation = ++lifecycleGeneration
       running = true
       connectionOnline = typeof navigator === 'undefined' || navigator.onLine
       wakeUnsubscribe = subscribeSyncWake(reason => engine.wake(reason))
@@ -199,17 +212,26 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
       let unsubscribe: () => Promise<void>
       try {
         unsubscribe = await input.transport.subscribe(
-          () => engine.wake('realtime'),
+          () => {
+            if (ownsLifecycle(generation)) engine.wake('realtime')
+          },
           online => {
+            if (!ownsLifecycle(generation)) return
             connectionOnline = online
             if (online) engine.wake('online')
           },
         )
       } catch (error) {
-        if (isActiveWorkspace()) await handleRequestError(error)
+        if (ownsLifecycle(generation)) {
+          await handleRequestError(error)
+          lifecycleGeneration++
+          removeLocalListeners()
+          running = false
+          queued = false
+        }
         return
       }
-      if (!isActiveWorkspace()) {
+      if (!ownsLifecycle(generation)) {
         await unsubscribe()
         return
       }
@@ -224,16 +246,14 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
 
     async stop() {
       if (!running) return
+      lifecycleGeneration++
       running = false
       queued = false
       if (retryTimer) {
         clearTimeout(retryTimer)
         retryTimer = null
       }
-      wakeUnsubscribe?.()
-      wakeUnsubscribe = null
-      if (typeof window !== 'undefined') window.removeEventListener('online', onlineListener)
-      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', visibilityListener)
+      removeLocalListeners()
       const unsubscribe = realtimeUnsubscribe
       realtimeUnsubscribe = null
       if (unsubscribe) await unsubscribe()
