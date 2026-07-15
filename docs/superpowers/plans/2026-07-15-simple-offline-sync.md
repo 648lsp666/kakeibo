@@ -371,10 +371,12 @@ git commit -m "feat: make local writes sync-atomic"
 - Create: `src/sync/sync-engine.test.ts`
 - Create: `src/sync/sync-store.ts`
 - Modify: `src/sync/contracts.ts`
+- Modify: `src/sync/domain-repository.ts`
+- Modify: `src/sync/domain-repository.test.ts`
 
 **Interfaces:**
 - Consumes: Task 1 RPC, Task 2 outbox/workspace generation, Task 3 repository.
-- Produces: `SyncTransport`, `createSupabaseTransport`, `createSyncEngine`, `useSyncStore`.
+- Produces: `SyncTransport`, `createSupabaseTransport`, `createSyncEngine`, `useSyncStore`, `domainRepository.acknowledgeOperation`.
 
 - [ ] **Step 1: Add failing transport mapping tests**
 
@@ -424,6 +426,8 @@ With fake transport and fake timers, prove:
 - stop/account-generation change prevents late results from writing another workspace;
 - duplicate wake events coalesce into one active loop.
 
+Also add a repository regression proving server acknowledgement, removal of exactly the confirmed outbox item, and re-overlay of any later pending operation for the same entity happen in one IndexedDB transaction. If that transaction fails, neither the cloud result nor outbox deletion may persist.
+
 - [ ] **Step 4: Implement the foreground engine**
 
 ```ts
@@ -445,6 +449,14 @@ export function createSyncEngine(input: {
 
 Allow one loop per engine instance. Before and after every awaited network call, require both `running` and `isWorkspaceCurrent(workspace)`. Retry delay is `min(2 ** attemptCount * 1000 + random() * 500, 300_000)`. While started, subscribe to Task 3's wake bus plus `online`, `visibilitychange`, and Realtime; unsubscribe all four sources on stop. Do not add service-worker background sync or leader election.
 
+Extend the repository boundary with:
+
+```ts
+acknowledgeOperation(operationId: string, result: OperationResult): Promise<void>
+```
+
+It must bind one workspace snapshot, apply the authoritative result, delete exactly `operationId`, then overlay remaining pending operations for the same entity by `enqueueOrder`, all in one readwrite transaction over the business store and outbox. The engine must call this method after every successful push; it must never call `applyCloudRecords()` and `outboxOps.delete()` as separate acknowledgement steps.
+
 - [ ] **Step 5: Verify and commit**
 
 Run:
@@ -458,7 +470,7 @@ npm run build
 Expected: all tests PASS; build succeeds.
 
 ```bash
-git add src/sync/contracts.ts src/sync/supabase-transport.ts src/sync/supabase-transport.test.ts src/sync/sync-engine.ts src/sync/sync-engine.test.ts src/sync/sync-store.ts
+git add src/sync/contracts.ts src/sync/supabase-transport.ts src/sync/supabase-transport.test.ts src/sync/sync-engine.ts src/sync/sync-engine.test.ts src/sync/sync-store.ts src/sync/domain-repository.ts src/sync/domain-repository.test.ts
 git commit -m "feat: add quiet foreground sync engine"
 ```
 
