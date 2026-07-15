@@ -25,7 +25,7 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
   const now = input.now ?? (() => new Date())
   const random = input.random ?? Math.random
   let running = false
-  let queued = false
+  let queuedGeneration: number | null = null
   let loopPromise: Promise<void> | null = null
   let realtimeUnsubscribe: (() => Promise<void>) | null = null
   let wakeUnsubscribe: (() => void) | null = null
@@ -35,8 +35,8 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
 
   const isActiveWorkspace = () => running && isWorkspaceCurrent(input.workspace)
   const ownsLifecycle = (generation: number) => isActiveWorkspace() && lifecycleGeneration === generation
-  const setStatus = (status: SyncStatus) => {
-    if (isActiveWorkspace()) useSyncStore.getState().setStatus(status)
+  const setStatus = (generation: number, status: SyncStatus) => {
+    if (ownsLifecycle(generation)) useSyncStore.getState().setStatus(status)
   }
   const pendingCount = () => input.workspace.db.countFromIndex('outbox', 'by-state', 'pending')
 
@@ -46,34 +46,46 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
   }
 
   async function updateOperation(
+    generation: number,
     operationId: string,
     update: (operation: PendingOperation & { enqueueOrder: number }) => PendingOperation & { enqueueOrder: number },
-  ): Promise<void> {
+  ): Promise<boolean> {
+    if (!ownsLifecycle(generation)) return false
     const tx = input.workspace.db.transaction('outbox', 'readwrite')
+    if (!ownsLifecycle(generation)) return false
     const operation = await tx.store.get(operationId)
-    if (operation) await tx.store.put(update(operation))
+    if (!ownsLifecycle(generation)) return false
+    if (operation) {
+      await tx.store.put(update(operation))
+      if (!ownsLifecycle(generation)) return false
+    }
     await tx.done
+    return ownsLifecycle(generation)
   }
 
-  function scheduleRetry(delay: number): void {
+  function scheduleRetry(generation: number, delay: number): void {
+    if (!ownsLifecycle(generation)) return
     if (retryTimer) clearTimeout(retryTimer)
     retryTimer = setTimeout(() => {
       retryTimer = null
-      engine.wake('manual')
+      if (ownsLifecycle(generation)) engine.wake('manual')
     }, delay)
   }
 
-  async function handleRequestError(error: unknown, operation?: PendingOperation): Promise<'continue' | 'stop'> {
-    const generation = lifecycleGeneration
+  async function handleRequestError(
+    generation: number,
+    error: unknown,
+    operation?: PendingOperation,
+  ): Promise<'continue' | 'stop'> {
     if (!ownsLifecycle(generation)) return 'stop'
     const pending = await pendingCount()
     if (!ownsLifecycle(generation)) return 'stop'
     if (error instanceof SyncTransportError && error.kind === 'auth') {
-      setStatus({ kind: 'auth-required', pending })
+      setStatus(generation, { kind: 'auth-required', pending })
       return 'stop'
     }
     if (operation && error instanceof SyncTransportError && error.kind === 'protocol') {
-      await updateOperation(operation.operationId, stored => ({
+      await updateOperation(generation, operation.operationId, stored => ({
         ...stored,
         state: 'isolated',
         lastError: error.message,
@@ -85,99 +97,114 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
       && (error.kind === 'rate-limit' || error.kind === 'transient')) {
       const attemptCount = operation.attemptCount + 1
       const delay = Math.min(2 ** attemptCount * 1000 + random() * 500, 300_000)
-      await updateOperation(operation.operationId, stored => ({
+      await updateOperation(generation, operation.operationId, stored => ({
         ...stored,
         attemptCount,
         nextAttemptAt: new Date(now().getTime() + delay).toISOString(),
         lastError: error.message,
       }))
       if (!ownsLifecycle(generation)) return 'stop'
-      scheduleRetry(delay)
+      scheduleRetry(generation, delay)
       const remaining = await pendingCount()
       if (!ownsLifecycle(generation)) return 'stop'
-      setStatus(connectionOnline
+      setStatus(generation, connectionOnline
         ? { kind: 'error', pending: remaining, message: error.message }
         : { kind: 'offline', pending: remaining })
       return 'stop'
     }
     const message = error instanceof Error ? error.message : 'Sync failed'
-    setStatus(connectionOnline
+    setStatus(generation, connectionOnline
       ? { kind: 'error', pending, message }
       : { kind: 'offline', pending })
     return 'stop'
   }
 
-  async function pullAndApply(): Promise<boolean> {
-    if (!isActiveWorkspace()) return false
+  async function pullAndApply(generation: number): Promise<boolean> {
+    if (!ownsLifecycle(generation)) return false
     let records
     try {
+      if (!ownsLifecycle(generation)) return false
       records = await input.transport.pullAll()
     } catch (error) {
-      if (!isActiveWorkspace()) return false
-      await handleRequestError(error)
+      if (!ownsLifecycle(generation)) return false
+      await handleRequestError(generation, error)
+      if (!ownsLifecycle(generation)) return false
       return false
     }
-    if (!isActiveWorkspace()) return false
+    if (!ownsLifecycle(generation)) return false
     await input.repository.applyCloudRecords(records)
-    return isActiveWorkspace()
+    return ownsLifecycle(generation)
   }
 
-  async function synchronize(): Promise<void> {
-    if (!isActiveWorkspace()) return
+  async function synchronize(generation: number): Promise<void> {
+    if (!ownsLifecycle(generation)) return
     const initialPending = await pendingCount()
-    if (!isActiveWorkspace()) return
+    if (!ownsLifecycle(generation)) return
     if (!connectionOnline || (typeof navigator !== 'undefined' && !navigator.onLine)) {
-      setStatus({ kind: 'offline', pending: initialPending })
+      setStatus(generation, { kind: 'offline', pending: initialPending })
       return
     }
-    setStatus({ kind: 'syncing', pending: initialPending })
-    if (!await pullAndApply()) return
+    setStatus(generation, { kind: 'syncing', pending: initialPending })
+    if (!ownsLifecycle(generation) || !await pullAndApply(generation)) return
+    if (!ownsLifecycle(generation)) return
 
     const operations = await pendingOperations()
-    if (!isActiveWorkspace()) return
+    if (!ownsLifecycle(generation)) return
     let pushed = false
     for (const operation of operations) {
       const retryDelay = Date.parse(operation.nextAttemptAt) - now().getTime()
       if (retryDelay > 0) {
-        scheduleRetry(retryDelay)
+        scheduleRetry(generation, retryDelay)
         break
       }
-      if (!isActiveWorkspace()) return
+      if (!ownsLifecycle(generation)) return
       let result
       try {
+        if (!ownsLifecycle(generation)) return
         result = await input.transport.push(operation)
       } catch (error) {
-        if (!isActiveWorkspace()) return
-        const action = await handleRequestError(error, operation)
+        if (!ownsLifecycle(generation)) return
+        const action = await handleRequestError(generation, error, operation)
+        if (!ownsLifecycle(generation)) return
         if (action === 'continue') continue
         return
       }
-      if (!isActiveWorkspace()) return
+      if (!ownsLifecycle(generation)) return
       await input.repository.acknowledgeOperation(operation.operationId, result)
-      if (!isActiveWorkspace()) return
+      if (!ownsLifecycle(generation)) return
       pushed = true
     }
 
-    if (pushed && !await pullAndApply()) return
-    if (!isActiveWorkspace()) return
+    if (pushed && (!ownsLifecycle(generation) || !await pullAndApply(generation))) return
+    if (!ownsLifecycle(generation)) return
     const lastSyncedAt = now().toISOString()
     await input.workspace.db.put('sync_meta', { key: 'last_synced_at', value: lastSyncedAt })
-    if (isActiveWorkspace()) setStatus({ kind: 'idle', lastSyncedAt })
+    if (ownsLifecycle(generation)) setStatus(generation, { kind: 'idle', lastSyncedAt })
   }
 
-  function requestLoop(): void {
-    if (!isActiveWorkspace()) return
-    queued = true
+  function requestLoop(generation: number): void {
+    if (!ownsLifecycle(generation)) return
+    queuedGeneration = generation
     if (loopPromise) return
     loopPromise = (async () => {
-      while (queued && isActiveWorkspace()) {
-        queued = false
-        await synchronize()
+      while (queuedGeneration === generation && ownsLifecycle(generation)) {
+        queuedGeneration = null
+        await synchronize(generation)
       }
     })().finally(() => {
       loopPromise = null
-      if (queued && isActiveWorkspace()) requestLoop()
+      const nextGeneration = queuedGeneration
+      if (nextGeneration !== null && ownsLifecycle(nextGeneration)) requestLoop(nextGeneration)
     })
+  }
+
+  async function waitForLoop(generation: number): Promise<void> {
+    while (ownsLifecycle(generation)) {
+      const activeLoop = loopPromise
+      if (!activeLoop) return
+      await activeLoop
+      if (!ownsLifecycle(generation)) return
+    }
   }
 
   const onlineListener = () => {
@@ -198,7 +225,7 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
   const engine: SyncEngine = {
     async start() {
       if (running) {
-        if (loopPromise) await loopPromise
+        await waitForLoop(lifecycleGeneration)
         return
       }
       const generation = ++lifecycleGeneration
@@ -208,9 +235,10 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
       if (typeof window !== 'undefined') window.addEventListener('online', onlineListener)
       if (typeof document !== 'undefined') document.addEventListener('visibilitychange', visibilityListener)
 
-      if (!isActiveWorkspace()) return
+      if (!ownsLifecycle(generation)) return
       let unsubscribe: () => Promise<void>
       try {
+        if (!ownsLifecycle(generation)) return
         unsubscribe = await input.transport.subscribe(
           () => {
             if (ownsLifecycle(generation)) engine.wake('realtime')
@@ -223,11 +251,12 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
         )
       } catch (error) {
         if (ownsLifecycle(generation)) {
-          await handleRequestError(error)
+          await handleRequestError(generation, error)
+          if (!ownsLifecycle(generation)) return
           lifecycleGeneration++
           removeLocalListeners()
           running = false
-          queued = false
+          queuedGeneration = null
         }
         return
       }
@@ -236,19 +265,20 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
         return
       }
       realtimeUnsubscribe = unsubscribe
-      requestLoop()
-      if (loopPromise) await loopPromise
+      requestLoop(generation)
+      await waitForLoop(generation)
     },
 
     wake(_reason) {
-      requestLoop()
+      requestLoop(lifecycleGeneration)
     },
 
     async stop() {
       if (!running) return
       lifecycleGeneration++
       running = false
-      queued = false
+      queuedGeneration = null
+      const stoppingLoop = loopPromise
       if (retryTimer) {
         clearTimeout(retryTimer)
         retryTimer = null
@@ -257,7 +287,7 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
       const unsubscribe = realtimeUnsubscribe
       realtimeUnsubscribe = null
       if (unsubscribe) await unsubscribe()
-      if (loopPromise) await loopPromise
+      if (stoppingLoop) await stoppingLoop
     },
   }
 

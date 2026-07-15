@@ -307,6 +307,71 @@ describe('foreground sync engine', () => {
     expect(secondUnsubscribe).toHaveBeenCalledOnce()
   })
 
+  it('does not apply an old pull when stop is not awaited before restart', async () => {
+    const oldRecord = {
+      entityType: 'transaction' as const,
+      entityId: 'old-pull-record',
+      record: pending('old-pull-record').payload,
+      updatedAt: now.toISOString(),
+      deletedAt: null,
+    }
+    let resolveOldPull: ((records: typeof oldRecord[]) => void) | undefined
+    const firstUnsubscribe = vi.fn().mockResolvedValue(undefined)
+    const secondUnsubscribe = vi.fn().mockResolvedValue(undefined)
+    const remote = transport({
+      pullAll: vi.fn()
+        .mockImplementationOnce(() => new Promise<typeof oldRecord[]>(resolve => { resolveOldPull = resolve }))
+        .mockResolvedValueOnce([]),
+      subscribe: vi.fn()
+        .mockResolvedValueOnce(firstUnsubscribe)
+        .mockResolvedValueOnce(secondUnsubscribe),
+    })
+    const repo = repository()
+    const engine = createSyncEngine({ userId: 'user-1', workspace: await getWorkspaceSnapshot(), transport: remote, repository: repo, now: () => now })
+
+    const firstStart = engine.start()
+    await vi.waitFor(() => expect(remote.pullAll).toHaveBeenCalledOnce())
+    const stopping = engine.stop()
+    const restarting = engine.start()
+    resolveOldPull?.([oldRecord])
+    await Promise.all([firstStart, stopping, restarting])
+
+    expect(repo.applyCloudRecords).not.toHaveBeenCalledWith([oldRecord])
+    await engine.stop()
+    expect(firstUnsubscribe).toHaveBeenCalledOnce()
+    expect(secondUnsubscribe).toHaveBeenCalledOnce()
+  })
+
+  it('does not let old subscription error cleanup stop a restarted lifecycle', async () => {
+    const workspace = await getWorkspaceSnapshot()
+    const originalCount = workspace.db.countFromIndex.bind(workspace.db)
+    let releaseErrorHandling: (() => void) | undefined
+    let markErrorHandlingStarted: (() => void) | undefined
+    const errorHandlingStarted = new Promise<void>(resolve => { markErrorHandlingStarted = resolve })
+    const errorHandlingGate = new Promise<number>(resolve => { releaseErrorHandling = () => resolve(0) })
+    vi.spyOn(workspace.db, 'countFromIndex').mockImplementationOnce(async () => {
+      markErrorHandlingStarted?.()
+      return errorHandlingGate
+    }).mockImplementation(((...args: unknown[]) => Reflect.apply(originalCount, workspace.db, args)) as never)
+    const secondUnsubscribe = vi.fn().mockResolvedValue(undefined)
+    const remote = transport({
+      subscribe: vi.fn()
+        .mockRejectedValueOnce(new SyncTransportError('old setup failed', 'transient', 503))
+        .mockResolvedValueOnce(secondUnsubscribe),
+    })
+    const engine = createSyncEngine({ userId: 'user-1', workspace, transport: remote, repository: repository(), now: () => now })
+
+    const firstStart = engine.start()
+    await errorHandlingStarted
+    await engine.stop()
+    await engine.start()
+    releaseErrorHandling?.()
+    await firstStart
+    await engine.stop()
+
+    expect(secondUnsubscribe).toHaveBeenCalledOnce()
+  })
+
   it('does not schedule a retry after stop while the outbox update is awaiting', async () => {
     await outboxOps.add(pending('stop-during-update'))
     const workspace = await getWorkspaceSnapshot()
