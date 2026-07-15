@@ -28,6 +28,7 @@ export function CloudSyncCard() {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const [signOutOpen, setSignOutOpen] = useState(false)
+  const [signOutPending, setSignOutPending] = useState(0)
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true)
@@ -54,6 +55,13 @@ export function CloudSyncCard() {
   const signOut = () => run(async () => {
     await auth.signOut()
     setSignOutOpen(false)
+  })
+
+  const prepareSignOut = () => run(async () => {
+    const pending = await auth.prepareSignOut()
+    setSignOutPending(pending)
+    if (pending > 0) setSignOutOpen(true)
+    else await auth.signOut()
   })
 
   return (
@@ -101,19 +109,16 @@ export function CloudSyncCard() {
       ) : (
         <div style={{ marginTop: 14 }}>
           <div style={{ color: 'var(--color-text)', fontSize: 13, fontWeight: 700, overflowWrap: 'anywhere' }}>
-            {auth.session.user.email}
+            {auth.session.user.email ?? '已登录账号'}
           </div>
           <div style={{ color: 'var(--color-text-small)', fontSize: 12, marginTop: 5 }}>
             {statusText(status, auth.pending)}
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button type="button" className="secondary-button" disabled={busy || auth.loading} onClick={auth.retry} style={{ flex: 1 }}>
+            <button type="button" className="secondary-button" disabled={busy} onClick={auth.retry} style={{ flex: 1 }}>
               立即重试
             </button>
-            <button type="button" className="secondary-button" disabled={busy || auth.loading} onClick={() => {
-              if (auth.pending > 0) setSignOutOpen(true)
-              else void signOut()
-            }} style={{ flex: 1 }}>
+            <button type="button" className="secondary-button" disabled={busy || auth.loading} onClick={() => { void prepareSignOut() }} style={{ flex: 1 }}>
               退出账号
             </button>
           </div>
@@ -131,7 +136,7 @@ export function CloudSyncCard() {
         description="继续前已生成一份本地 JSON 备份。确认后会保留原有记录 ID，并开始账号同步。"
         busy={busy || auth.loading}
         closeDisabled={busy || auth.loading}
-        onClose={() => { void skipMigration() }}
+        onClose={() => undefined}
         footer={
           <div style={{ display: 'flex', gap: 10 }}>
             <button type="button" className="secondary-button" disabled={busy || auth.loading} onClick={() => { void skipMigration() }} style={{ flex: 1 }}>
@@ -151,7 +156,7 @@ export function CloudSyncCard() {
       <ConfirmDialog
         open={signOutOpen}
         title="退出同步账号？"
-        description={`仍有 ${auth.pending} 项待同步。退出后会保留在此账号的本地账本中。`}
+        description={`仍有 ${signOutPending} 项待同步。退出后会保留在此账号的本地账本中。`}
         confirmLabel="确认退出"
         busy={busy}
         error={notice?.tone === 'error' ? notice.text : undefined}

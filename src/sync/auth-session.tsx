@@ -2,7 +2,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { nanoid } from 'nanoid'
 import type { Session, SupabaseClient } from '@supabase/supabase-js'
 import { domainRepository, type DomainSnapshot } from './domain-repository'
-import { getWorkspaceSnapshot, switchWorkspace, withWorkspaceWrite } from './local-db'
+import {
+  getWorkspaceSnapshot,
+  isWorkspaceCurrent,
+  outboxOps,
+  switchWorkspace,
+  withWorkspaceWrite,
+  type WorkspaceSnapshot,
+} from './local-db'
 import { createSyncEngine, type SyncEngine } from './sync-engine'
 import { getSupabaseClientIfConfigured } from './supabase-client'
 import { createSupabaseTransport } from './supabase-transport'
@@ -16,6 +23,7 @@ export interface AuthSyncContextValue {
   sendOtp(email: string): Promise<void>
   confirmMigration(): Promise<void>
   skipMigration(): Promise<void>
+  prepareSignOut(): Promise<number>
   signOut(): Promise<void>
   retry(): void
 }
@@ -26,10 +34,20 @@ interface AnonymousMigrationService {
   markSkipped(userId: string): Promise<void>
 }
 
+interface EffectToken { active: boolean }
+interface ActionToken {
+  effect: EffectToken
+  id: number
+  requestId: number
+  userId?: string
+}
+
 const AuthSyncContext = createContext<AuthSyncContextValue | null>(null)
 const migrationMarker = (userId: string) => `anonymous_migration_complete:${userId}`
 
-function createAnonymousMigrationService(): AnonymousMigrationService {
+function createAnonymousMigrationService(
+  assertTargetWorkspace: (userId: string) => Promise<WorkspaceSnapshot>,
+): AnonymousMigrationService {
   return {
     async prepare(userId) {
       const snapshot = await domainRepository.exportSnapshot()
@@ -46,6 +64,7 @@ function createAnonymousMigrationService(): AnonymousMigrationService {
       await switchWorkspace({ kind: 'user', userId })
       const timestamp = new Date().toISOString()
       try {
+        await assertTargetWorkspace(userId)
         await withWorkspaceWrite(
           ['transactions', 'categories', 'budgets', 'outbox', 'sync_meta'],
           async tx => {
@@ -91,17 +110,26 @@ function createAnonymousMigrationService(): AnonymousMigrationService {
             if (enqueueOrder !== Number.parseInt(current?.value ?? '0', 10)) {
               await meta.put({ key: 'outbox_sequence', value: String(enqueueOrder) })
             }
+            await meta.put({ key: migrationMarker(userId), value: 'complete' })
           },
         )
       } catch (error) {
         await switchWorkspace({ kind: 'anonymous' })
         throw error
       }
-      localStorage.setItem(migrationMarker(userId), 'complete')
     },
 
     async markSkipped(userId) {
-      localStorage.setItem(migrationMarker(userId), 'skipped')
+      await switchWorkspace({ kind: 'user', userId })
+      try {
+        await assertTargetWorkspace(userId)
+        await withWorkspaceWrite(['sync_meta'], async tx => {
+          await tx.objectStore('sync_meta').put({ key: migrationMarker(userId), value: 'skipped' })
+        })
+      } catch (error) {
+        await switchWorkspace({ kind: 'anonymous' })
+        throw error
+      }
     },
   }
 }
@@ -117,13 +145,23 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
   const syncStatus = useSyncStore(state => state.status)
   const clientRef = useRef<SupabaseClient | null>(null)
   const engineRef = useRef<SyncEngine | null>(null)
-  const generationRef = useRef(0)
   const queueRef = useRef<Promise<void>>(Promise.resolve())
-  const mountedRef = useRef(false)
+  const activeEffectRef = useRef<EffectToken | null>(null)
+  const currentActionRef = useRef<ActionToken | null>(null)
+  const actionIdRef = useRef(0)
+  const requestIdRef = useRef(0)
   const pendingMigrationRef = useRef<{ userId: string; snapshot: DomainSnapshot } | null>(null)
-  const migrationServiceRef = useRef<AnonymousMigrationService>(createAnonymousMigrationService())
+  const desiredSessionRef = useRef<Session | null>(null)
 
-  const owns = useCallback((generation: number) => mountedRef.current && generationRef.current === generation, [])
+  const effectIsActive = useCallback((effect: EffectToken) => (
+    effect.active && activeEffectRef.current === effect
+  ), [])
+  const ownsAction = useCallback((token: ActionToken) => (
+    effectIsActive(token.effect) && currentActionRef.current === token
+  ), [effectIsActive])
+  const mayExposeAction = useCallback((token: ActionToken) => (
+    ownsAction(token) && token.requestId === requestIdRef.current
+  ), [ownsAction])
 
   const stopEngine = useCallback(async () => {
     const engine = engineRef.current
@@ -131,18 +169,51 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
     if (engine) await engine.stop()
   }, [])
 
+  const assertTargetWorkspace = useCallback(async (token: ActionToken, userId: string) => {
+    if (!ownsAction(token) || token.userId !== userId) throw new Error('Account lifecycle changed')
+    const workspace = await getWorkspaceSnapshot()
+    if (!ownsAction(token)
+      || workspace.id.kind !== 'user'
+      || workspace.id.userId !== userId) {
+      throw new Error('Account workspace changed')
+    }
+    return workspace
+  }, [ownsAction])
+
+  const enqueueAction = useCallback((
+    effect: EffectToken,
+    action: (token: ActionToken) => Promise<void>,
+  ): Promise<void> => {
+    if (!effectIsActive(effect)) return Promise.resolve()
+    const requestId = ++requestIdRef.current
+    setLoading(true)
+    queueRef.current = queueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        if (!effectIsActive(effect)) return
+        const token: ActionToken = { effect, id: ++actionIdRef.current, requestId }
+        currentActionRef.current = token
+        try {
+          await action(token)
+        } finally {
+          if (currentActionRef.current === token) currentActionRef.current = null
+        }
+      })
+    return queueRef.current
+  }, [effectIsActive])
+
   const startAccount = useCallback(async (
     nextSession: Session,
-    generation: number,
+    token: ActionToken,
     workspaceReady = false,
   ) => {
     const userId = nextSession.user.id
+    token.userId = userId
     if (!workspaceReady) await switchWorkspace({ kind: 'user', userId })
-    if (!owns(generation)) return
-    const workspace = await getWorkspaceSnapshot()
-    if (!owns(generation)) return
+    const workspace = await assertTargetWorkspace(token, userId)
+    if (!mayExposeAction(token)) return
     const client = clientRef.current
-    if (!client) return
+    if (!client) throw new Error('云同步尚未配置')
     const engine = createSyncEngine({
       userId,
       workspace,
@@ -151,7 +222,7 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
     })
     engineRef.current = engine
     await engine.start()
-    if (!owns(generation)) {
+    if (!mayExposeAction(token)) {
       if (engineRef.current === engine) engineRef.current = null
       await engine.stop()
       return
@@ -159,16 +230,32 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
     setSession(nextSession)
     setMigrationRequired(false)
     setLoading(false)
-  }, [owns])
+  }, [assertTargetWorkspace, mayExposeAction])
 
-  const transition = useCallback(async (nextSession: Session | null, generation: number) => {
+  const recoverLifecycle = useCallback(async (
+    nextSession: Session | null,
+    token: ActionToken,
+    error: unknown,
+  ) => {
     await stopEngine()
-    if (!owns(generation)) return
+    if (!ownsAction(token)) return
+    await switchWorkspace({ kind: 'anonymous' })
+    if (!mayExposeAction(token)) return
+    setSession(nextSession)
+    setMigrationRequired(false)
+    setLoading(true)
+    useSyncStore.getState().setStatus({ kind: 'error', pending: 0, message: message(error) })
+  }, [mayExposeAction, ownsAction, stopEngine])
+
+  const transition = useCallback(async (nextSession: Session | null, token: ActionToken) => {
+    let preparingMigration = false
+    await stopEngine()
+    if (!ownsAction(token)) return
 
     if (!nextSession) {
       pendingMigrationRef.current = null
       await switchWorkspace({ kind: 'anonymous' })
-      if (!owns(generation)) return
+      if (!mayExposeAction(token)) return
       useSyncStore.getState().setStatus({ kind: 'local-only' })
       setSession(null)
       setMigrationRequired(false)
@@ -177,72 +264,98 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
     }
 
     const userId = nextSession.user.id
-    if (!localStorage.getItem(migrationMarker(userId))) {
-      try {
-        const prepared = await migrationServiceRef.current.prepare(userId)
-        if (!owns(generation)) return
-        pendingMigrationRef.current = { userId, snapshot: prepared.snapshot }
-        setSession(nextSession)
-        setMigrationRequired(true)
-        setLoading(false)
-      } catch (error) {
-        if (!owns(generation)) return
-        pendingMigrationRef.current = null
-        setSession(nextSession)
-        setMigrationRequired(true)
-        setLoading(false)
-        useSyncStore.getState().setStatus({ kind: 'error', pending: 0, message: message(error) })
+    token.userId = userId
+    try {
+      await switchWorkspace({ kind: 'user', userId })
+      const target = await assertTargetWorkspace(token, userId)
+      const marker = await target.db.get('sync_meta', migrationMarker(userId))
+      if (!ownsAction(token)) return
+      if (marker) {
+        await startAccount(nextSession, token, true)
+        return
       }
-      return
-    }
 
-    await startAccount(nextSession, generation)
-  }, [owns, startAccount, stopEngine])
-
-  const enqueue = useCallback((nextSession: Session | null) => {
-    const generation = ++generationRef.current
-    queueRef.current = queueRef.current
-      .catch(() => undefined)
-      .then(() => transition(nextSession, generation))
-      .catch(error => {
-        if (!owns(generation)) return
+      preparingMigration = true
+      await switchWorkspace({ kind: 'anonymous' })
+      if (!ownsAction(token)) return
+      const anonymous = await getWorkspaceSnapshot()
+      if (!ownsAction(token) || anonymous.id.kind !== 'anonymous') throw new Error('Anonymous workspace changed')
+      const migration = createAnonymousMigrationService(id => assertTargetWorkspace(token, id))
+      const prepared = await migration.prepare(userId)
+      if (!mayExposeAction(token)) return
+      pendingMigrationRef.current = { userId, snapshot: prepared.snapshot }
+      setSession(nextSession)
+      setMigrationRequired(true)
+      setLoading(false)
+    } catch (error) {
+      if (!ownsAction(token)) return
+      if (preparingMigration || pendingMigrationRef.current?.userId === userId) {
+        if (!mayExposeAction(token)) return
+        setSession(nextSession)
+        setMigrationRequired(true)
         setLoading(false)
         useSyncStore.getState().setStatus({ kind: 'error', pending: 0, message: message(error) })
-      })
-    return queueRef.current
-  }, [owns, transition])
+        return
+      }
+      await recoverLifecycle(nextSession, token, error)
+    }
+  }, [assertTargetWorkspace, mayExposeAction, ownsAction, recoverLifecycle, startAccount, stopEngine])
+
+  const scheduleTransition = useCallback((effect: EffectToken, nextSession: Session | null) => {
+    if (!effectIsActive(effect)) return Promise.resolve()
+    desiredSessionRef.current = nextSession
+    return enqueueAction(effect, async token => {
+      try {
+        await transition(nextSession, token)
+      } catch (error) {
+        if (ownsAction(token)) await recoverLifecycle(nextSession, token, error)
+      }
+    })
+  }, [effectIsActive, enqueueAction, ownsAction, recoverLifecycle, transition])
 
   useEffect(() => {
-    mountedRef.current = true
+    const effect: EffectToken = { active: true }
+    activeEffectRef.current = effect
+    let lastAuthIdentity: string | null | undefined
+    const acceptAuthSession = (nextSession: Session | null) => {
+      if (!effectIsActive(effect)) return
+      const identity = nextSession?.user.id ?? null
+      if (lastAuthIdentity === identity) return
+      lastAuthIdentity = identity
+      void scheduleTransition(effect, nextSession)
+    }
     const client = getSupabaseClientIfConfigured()
     clientRef.current = client
     if (!client) {
+      desiredSessionRef.current = null
       useSyncStore.getState().setStatus({ kind: 'local-only' })
       setLoading(false)
       return () => {
-        mountedRef.current = false
-        generationRef.current++
+        effect.active = false
+        if (activeEffectRef.current === effect) activeEffectRef.current = null
       }
     }
 
     const { data } = client.auth.onAuthStateChange((_event, nextSession) => {
-      void enqueue(nextSession)
+      acceptAuthSession(nextSession)
     })
     void client.auth.getSession().then(({ data: restored, error }) => {
+      if (!effectIsActive(effect)) return
       if (error) throw error
-      return enqueue(restored.session)
+      acceptAuthSession(restored.session)
     }).catch(error => {
-      setLoading(false)
+      if (!effectIsActive(effect)) return
+      setLoading(true)
       useSyncStore.getState().setStatus({ kind: 'error', pending: 0, message: message(error) })
     })
 
     return () => {
-      mountedRef.current = false
-      generationRef.current++
+      effect.active = false
+      if (activeEffectRef.current === effect) activeEffectRef.current = null
       data.subscription.unsubscribe()
       void stopEngine()
     }
-  }, [enqueue, stopEngine])
+  }, [effectIsActive, scheduleTransition, stopEngine])
 
   const sendOtp = useCallback(async (email: string) => {
     const client = clientRef.current
@@ -254,58 +367,80 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error
   }, [])
 
-  const confirmMigration = useCallback(async () => {
-    const pendingMigration = pendingMigrationRef.current
-    if (!session || !pendingMigration || pendingMigration.userId !== session.user.id) {
-      if (session) await enqueue(session)
-      return
-    }
-    const generation = ++generationRef.current
-    setLoading(true)
-    try {
-      await migrationServiceRef.current.commit(pendingMigration.userId, pendingMigration.snapshot)
-      if (!owns(generation)) return
-      pendingMigrationRef.current = null
-      await startAccount(session, generation, true)
-    } catch (error) {
-      if (!owns(generation)) return
-      setLoading(false)
-      setMigrationRequired(true)
-      useSyncStore.getState().setStatus({ kind: 'error', pending: 0, message: message(error) })
-    }
-  }, [enqueue, owns, session, startAccount])
+  const confirmMigration = useCallback(() => {
+    const effect = activeEffectRef.current
+    const pending = pendingMigrationRef.current
+    const accountSession = session
+    if (!effect || !accountSession) return Promise.resolve()
+    return enqueueAction(effect, async token => {
+      token.userId = accountSession.user.id
+      if (!pending || pending.userId !== accountSession.user.id) {
+        await transition(accountSession, token)
+        return
+      }
+      try {
+        const migration = createAnonymousMigrationService(id => assertTargetWorkspace(token, id))
+        await migration.commit(pending.userId, pending.snapshot)
+        if (!ownsAction(token)) return
+        pendingMigrationRef.current = null
+        if (mayExposeAction(token)) await startAccount(accountSession, token, true)
+      } catch (error) {
+        if (!mayExposeAction(token)) return
+        setSession(accountSession)
+        setMigrationRequired(true)
+        setLoading(false)
+        useSyncStore.getState().setStatus({ kind: 'error', pending: 0, message: message(error) })
+      }
+    })
+  }, [assertTargetWorkspace, enqueueAction, mayExposeAction, ownsAction, session, startAccount, transition])
 
-  const skipMigration = useCallback(async () => {
-    if (!session) return
-    const generation = ++generationRef.current
-    setLoading(true)
-    try {
-      await migrationServiceRef.current.markSkipped(session.user.id)
-      if (!owns(generation)) return
-      pendingMigrationRef.current = null
-      await startAccount(session, generation)
-    } catch (error) {
-      if (!owns(generation)) return
-      setLoading(false)
-      useSyncStore.getState().setStatus({ kind: 'error', pending: 0, message: message(error) })
+  const skipMigration = useCallback(() => {
+    const effect = activeEffectRef.current
+    const accountSession = session
+    if (!effect || !accountSession) return Promise.resolve()
+    return enqueueAction(effect, async token => {
+      token.userId = accountSession.user.id
+      try {
+        const migration = createAnonymousMigrationService(id => assertTargetWorkspace(token, id))
+        await migration.markSkipped(accountSession.user.id)
+        if (!ownsAction(token)) return
+        pendingMigrationRef.current = null
+        if (mayExposeAction(token)) await startAccount(accountSession, token, true)
+      } catch (error) {
+        if (!mayExposeAction(token)) return
+        setLoading(false)
+        setMigrationRequired(true)
+        useSyncStore.getState().setStatus({ kind: 'error', pending: 0, message: message(error) })
+      }
+    })
+  }, [assertTargetWorkspace, enqueueAction, mayExposeAction, ownsAction, session, startAccount])
+
+  const prepareSignOut = useCallback(async () => {
+    if (!session) return 0
+    const workspace = await getWorkspaceSnapshot()
+    if (workspace.id.kind !== 'user' || workspace.id.userId !== session.user.id) {
+      throw new Error('Account workspace changed')
     }
-  }, [owns, session, startAccount])
+    const pending = await outboxOps.countPending()
+    if (!isWorkspaceCurrent(workspace)) throw new Error('Account workspace changed')
+    return pending
+  }, [session])
 
   const signOut = useCallback(async () => {
     const client = clientRef.current
     if (!client) return
     const { error } = await client.auth.signOut()
     if (error) throw error
-    await enqueue(null)
-  }, [enqueue])
+  }, [])
 
   const retry = useCallback(() => {
-    if (migrationRequired && session) {
-      void enqueue(session)
+    const effect = activeEffectRef.current
+    if (effect && desiredSessionRef.current) {
+      void scheduleTransition(effect, desiredSessionRef.current)
       return
     }
     engineRef.current?.wake('manual')
-  }, [enqueue, migrationRequired, session])
+  }, [scheduleTransition])
 
   const value = useMemo<AuthSyncContextValue>(() => ({
     session,
@@ -315,9 +450,10 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
     sendOtp,
     confirmMigration,
     skipMigration,
+    prepareSignOut,
     signOut,
     retry,
-  }), [confirmMigration, loading, migrationRequired, retry, sendOtp, session, signOut, skipMigration, syncStatus])
+  }), [confirmMigration, loading, migrationRequired, prepareSignOut, retry, sendOtp, session, signOut, skipMigration, syncStatus])
 
   return <AuthSyncContext.Provider value={value}>{children}</AuthSyncContext.Provider>
 }

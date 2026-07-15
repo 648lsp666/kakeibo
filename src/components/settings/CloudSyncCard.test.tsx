@@ -21,6 +21,7 @@ function auth(overrides: Record<string, unknown> = {}) {
     confirmMigration: vi.fn().mockResolvedValue(undefined),
     skipMigration: vi.fn().mockResolvedValue(undefined),
     signOut: vi.fn().mockResolvedValue(undefined),
+    prepareSignOut: vi.fn().mockResolvedValue(0),
     retry: vi.fn(),
     ...overrides,
   }
@@ -47,6 +48,7 @@ describe('CloudSyncCard', () => {
     mocks.auth = auth({
       session: { user: { id: 'user-1', email: 'reader@example.com' } },
       pending: 3,
+      prepareSignOut: vi.fn().mockResolvedValue(3),
     })
     mocks.status = { kind: 'offline', pending: 3 }
     render(<CloudSyncCard />)
@@ -76,6 +78,52 @@ describe('CloudSyncCard', () => {
     expect(screen.getByText(/JSON 备份/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '确认合并' }))
     await waitFor(() => expect(mocks.auth.confirmMigration).toHaveBeenCalledOnce())
+  })
+
+  it('does not skip migration through Sheet close paths', async () => {
+    mocks.auth = auth({
+      session: { user: { id: 'user-1', email: 'reader@example.com' } },
+      migrationRequired: true,
+    })
+    const user = userEvent.setup()
+    render(<CloudSyncCard />)
+
+    await user.click(screen.getByRole('button', { name: '关闭' }))
+    expect(mocks.auth.skipMigration).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: '合并本地账本？' })).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+    expect(mocks.auth.skipMigration).not.toHaveBeenCalled()
+
+    const dialog = screen.getByRole('dialog', { name: '合并本地账本？' })
+    await user.click(dialog.parentElement!)
+    expect(mocks.auth.skipMigration).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: '暂不合并' }))
+    await waitFor(() => expect(mocks.auth.skipMigration).toHaveBeenCalledOnce())
+  })
+
+  it('uses the authoritative workspace pending count before sign-out', async () => {
+    mocks.auth = auth({
+      session: { user: { id: 'user-1', email: 'reader@example.com' } },
+      pending: 0,
+      prepareSignOut: vi.fn().mockResolvedValue(4),
+    })
+    render(<CloudSyncCard />)
+
+    await userEvent.click(screen.getByRole('button', { name: '退出账号' }))
+
+    expect(mocks.auth.prepareSignOut).toHaveBeenCalledOnce()
+    expect(screen.getByRole('dialog', { name: '退出同步账号？' })).toHaveTextContent('仍有 4 项待同步')
+    expect(mocks.auth.signOut).not.toHaveBeenCalled()
+  })
+
+  it('shows a stable fallback when the signed-in session has no email', () => {
+    mocks.auth = auth({ session: { user: { id: 'user-1', email: null } } })
+
+    render(<CloudSyncCard />)
+
+    expect(screen.getByText('已登录账号')).toBeInTheDocument()
   })
 
   it('surfaces recoverable OTP errors', async () => {
