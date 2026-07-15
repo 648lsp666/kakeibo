@@ -1,27 +1,8 @@
-import { openDB, IDBPDatabase } from 'idb'
-import type { Transaction, Category } from '../types'
-
-interface KakeiboSchema {
-  transactions: { key: string; value: Transaction; indexes: { 'by-date': string; 'by-external': string } }
-  categories: { key: string; value: Category; indexes: { 'by-sort': number } }
-  sync_config: { key: string; value: { key: string; value: string } }
-}
-
-let _db: IDBPDatabase<KakeiboSchema> | null = null
+import type { BudgetRule, Category, Transaction } from '../types'
+import { getActiveWorkspace } from '../sync/local-db'
 
 export async function getDb() {
-  if (_db) return _db
-  _db = await openDB<KakeiboSchema>('kakeibo', 1, {
-    upgrade(db) {
-      const txStore = db.createObjectStore('transactions', { keyPath: 'id' })
-      txStore.createIndex('by-date', 'date')
-      txStore.createIndex('by-external', 'externalId', { unique: false })
-      const catStore = db.createObjectStore('categories', { keyPath: 'id' })
-      catStore.createIndex('by-sort', 'sortOrder')
-      db.createObjectStore('sync_config', { keyPath: 'key' })
-    },
-  })
-  return _db
+  return getActiveWorkspace()
 }
 
 export const transactionOps = {
@@ -113,5 +94,34 @@ export const syncConfigOps = {
   async delete(key: string): Promise<void> {
     const db = await getDb()
     await db.delete('sync_config', key)
+  },
+}
+
+function withoutRevision(row: BudgetRule & { revision: number }): BudgetRule {
+  const { revision: _revision, ...budget } = row
+  return budget
+}
+
+export const budgetOps = {
+  async list(): Promise<BudgetRule[]> {
+    const db = await getDb()
+    const rows = await db.getAll('budgets')
+    return rows.map(withoutRevision)
+  },
+
+  async add(rule: BudgetRule): Promise<void> {
+    const db = await getDb()
+    await db.put('budgets', { ...rule, revision: 0 })
+  },
+
+  async update(rule: BudgetRule): Promise<void> {
+    const db = await getDb()
+    const existing = await db.get('budgets', rule.id)
+    await db.put('budgets', { ...rule, revision: existing?.revision ?? 0 })
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = await getDb()
+    await db.delete('budgets', id)
   },
 }
