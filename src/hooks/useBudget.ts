@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid'
 import { budgetOps, transactionOps } from '../lib/db'
 import { useAppStore } from '../store/appStore'
 import type { BudgetRule, BudgetStatus, Transaction } from '../types'
+import { domainRepository } from '../sync/domain-repository'
 
 function daysBetween(a: string, b: string): number {
   return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000)
@@ -95,17 +96,17 @@ export function useBudget() {
 
   const addRule = async (data: Omit<BudgetRule, 'id'>) => {
     const rule = { ...data, id: nanoid() }
-    await budgetOps.add(rule)
+    await domainRepository.upsert('budget', rule)
     await publish([...rules, rule])
   }
 
   const updateRule = async (updated: BudgetRule) => {
-    await budgetOps.update(updated)
+    await domainRepository.upsert('budget', updated)
     await publish(rules.map(r => r.id === updated.id ? updated : r))
   }
 
   const deleteRule = async (id: string) => {
-    await budgetOps.delete(id)
+    await domainRepository.remove('budget', id)
     await publish(rules.filter(r => r.id !== id))
   }
 

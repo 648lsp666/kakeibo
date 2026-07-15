@@ -4,6 +4,7 @@ import { seedCategories } from '../lib/seed'
 import type { Category } from '../types'
 import type { IconName } from '../components/ui/Icon'
 import { nanoid } from 'nanoid'
+import { domainRepository } from '../sync/domain-repository'
 
 export type NewCategoryInput = {
   name: string
@@ -34,14 +35,14 @@ export function useCategories() {
       sortOrder: maxSort + 1,
       createdAt: new Date().toISOString(),
     }
-    await categoryOps.add(cat)
+    await domainRepository.upsert('category', cat)
     await load()
   }, [load])
 
   const deleteCategory = useCallback(async (id: string) => {
     const cat = categories.find(c => c.id === id)
     if (cat?.isSystem) throw new Error('系统分类不可删除')
-    await categoryOps.delete(id)
+    await domainRepository.remove('category', id)
     await load()
   }, [categories, load])
 
