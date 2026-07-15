@@ -1,5 +1,6 @@
 import { WebDAVConfig } from '../components/settings/WebDAVConfig'
 import { DataManager } from '../components/settings/DataManager'
+import { CloudSyncCard } from '../components/settings/CloudSyncCard'
 
 export function SettingsPage() {
   return (
@@ -10,9 +11,12 @@ export function SettingsPage() {
           管理同步备份和本地数据。
         </p>
       </header>
-      <section className="surface" aria-labelledby="sync-settings-title" style={{ padding: 16 }}>
+      <section aria-labelledby="sync-settings-title">
         <h2 id="sync-settings-title" style={sectionTitle}>同步与备份</h2>
-        <WebDAVConfig />
+        <CloudSyncCard />
+        <div className="surface" style={{ marginTop: 14, padding: 16 }}>
+          <WebDAVConfig />
+        </div>
       </section>
       <section className="surface" aria-labelledby="data-settings-title" style={{ marginTop: 14, padding: 16 }}>
         <h2 id="data-settings-title" style={sectionTitle}>数据管理</h2>

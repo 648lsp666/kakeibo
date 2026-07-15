@@ -6,8 +6,17 @@ import { CategoryPage } from './pages/CategoryPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { AddSheet } from './components/entry/AddSheet'
 import './index.css'
+import { AuthSyncProvider } from './sync/auth-session'
 
 export default function App() {
+  return (
+    <AuthSyncProvider>
+      <AppContent />
+    </AuthSyncProvider>
+  )
+}
+
+function AppContent() {
   const { activeTab } = useAppStore()
 
   return (

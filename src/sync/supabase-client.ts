@@ -28,3 +28,11 @@ export function getSupabaseClient(): SupabaseClient {
   }
   return client
 }
+
+export function getSupabaseClientIfConfigured(): SupabaseClient | null {
+  try {
+    return getSupabaseClient()
+  } catch {
+    return null
+  }
+}
