@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { getDb, transactionOps, categoryOps, syncConfigOps, budgetOps } from './db'
 import { switchWorkspace } from '../sync/local-db'
 import type { Transaction, Category, BudgetRule } from '../types'
@@ -56,6 +56,19 @@ describe('transactionOps', () => {
     await transactionOps.delete('tx-1')
     const result = await transactionOps.getByMonth('2026-06')
     expect(result).toHaveLength(0)
+  })
+
+  it('binds addMany duplicate checks and writes to one database transaction', async () => {
+    const db = await getDb()
+    const transactionSpy = vi.spyOn(db, 'transaction')
+
+    await transactionOps.addMany([
+      { ...mockTx(), id: 'batch-1', externalId: 'batch-ext-1' },
+      { ...mockTx(), id: 'batch-2', externalId: 'batch-ext-2' },
+    ])
+
+    expect(transactionSpy).toHaveBeenCalledTimes(1)
+    expect(await db.getAll('transactions')).toHaveLength(2)
   })
 })
 

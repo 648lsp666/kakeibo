@@ -1,15 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import type { OutboxMutation, RemoteChange } from './contracts'
+import type { PendingOperation } from './contracts'
 import {
-  applyRemoteChanges,
   getActiveWorkspace,
+  getWorkspaceSnapshot,
+  isWorkspaceCurrent,
   openWorkspace,
   outboxOps,
+  setWorkspaceOpenerForTests,
+  syncMetaOps,
   switchWorkspace,
   withWorkspaceWrite,
   workspaceDbName,
 } from './local-db'
 import type { BudgetRule, Transaction } from '../types'
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>(res => { resolve = res })
+  return { promise, resolve }
+}
 
 const transaction = (id: string, note = 'local'): Transaction => ({
   id,
@@ -23,14 +32,11 @@ const transaction = (id: string, note = 'local'): Transaction => ({
   updatedAt: '2026-07-15T00:00:00.000Z',
 })
 
-const mutation = (payload: Transaction): OutboxMutation => ({
-  mutationId: `mutation-${payload.id}`,
-  userId: 'user-local-db',
-  deviceId: 'device-local-db',
+const operation = (payload: Transaction, operationId = `operation-${payload.id}`): PendingOperation => ({
+  operationId,
   entityType: 'transaction',
   entityId: payload.id,
   operation: 'upsert',
-  baseRevision: 0,
   payload,
   createdAt: '2026-07-15T00:00:00.000Z',
   attemptCount: 0,
@@ -70,6 +76,42 @@ async function createVersionOneDatabase(
   })
 }
 
+async function createVersionTwoDatabase(name: string, tx: Transaction): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open(name, 2)
+    request.onerror = () => reject(request.error)
+    request.onupgradeneeded = () => {
+      const db = request.result
+      const transactions = db.createObjectStore('transactions', { keyPath: 'id' })
+      transactions.createIndex('by-date', 'date')
+      transactions.createIndex('by-external', 'externalId')
+      const categories = db.createObjectStore('categories', { keyPath: 'id' })
+      categories.createIndex('by-sort', 'sortOrder')
+      db.createObjectStore('budgets', { keyPath: 'id' })
+      db.createObjectStore('sync_config', { keyPath: 'key' })
+      db.createObjectStore('outbox', { keyPath: 'mutationId' })
+      db.createObjectStore('sync_meta', { keyPath: 'key' })
+
+      request.transaction!.objectStore('transactions').put(tx)
+      request.transaction!.objectStore('sync_config').put({ key: 'webdav_url', value: 'https://dav.example.com' })
+      request.transaction!.objectStore('sync_meta').put({ key: 'last_synced_at', value: '2026-07-15T00:00:00.000Z' })
+      request.transaction!.objectStore('outbox').put({
+        mutationId: `legacy-${tx.id}`,
+        entityType: 'transaction',
+        entityId: tx.id,
+        operation: 'upsert',
+        payload: tx,
+        createdAt: '2026-07-15T00:00:00.000Z',
+        state: 'pending',
+      })
+    }
+    request.onsuccess = () => {
+      request.result.close()
+      resolve()
+    }
+  })
+}
+
 describe('workspace database', () => {
   it('maps anonymous and distinct users to distinct database names', async () => {
     const anonymous = await openWorkspace({ kind: 'anonymous' })
@@ -88,7 +130,7 @@ describe('workspace database', () => {
     userB.close()
   })
 
-  it('keeps version-1 data when opening the version-2 workspace', async () => {
+  it('keeps version-1 data when opening the version-3 workspace', async () => {
     const id = { kind: 'user', userId: 'local-db-v1-data' } as const
     const legacy = transaction('legacy-transaction')
     await createVersionOneDatabase(workspaceDbName(id), legacy)
@@ -96,7 +138,7 @@ describe('workspace database', () => {
     const db = await openWorkspace(id)
 
     expect(await db.get('transactions', legacy.id)).toMatchObject(legacy)
-    expect(db.version).toBe(2)
+    expect(db.version).toBe(3)
     db.close()
   })
 
@@ -112,83 +154,93 @@ describe('workspace database', () => {
     db.close()
   })
 
-  it('atomically writes a transaction and its outbox mutation', async () => {
+  it('upgrades v2 to v3 without losing business, config, or sync metadata', async () => {
+    const id = { kind: 'user', userId: 'local-db-v2-data' } as const
+    const legacy = transaction('v2-transaction')
+    await createVersionTwoDatabase(workspaceDbName(id), legacy)
+
+    const db = await openWorkspace(id)
+
+    expect(db.version).toBe(3)
+    expect(await db.get('transactions', legacy.id)).toEqual(legacy)
+    expect(await db.get('sync_config', 'webdav_url')).toEqual({
+      key: 'webdav_url',
+      value: 'https://dav.example.com',
+    })
+    expect(await db.get('sync_meta', 'last_synced_at')).toEqual({
+      key: 'last_synced_at',
+      value: '2026-07-15T00:00:00.000Z',
+    })
+    expect(await db.getAll('outbox')).toEqual([])
+    const outboxStore = db.transaction('outbox').store
+    expect(outboxStore.keyPath).toBe('operationId')
+    expect(Array.from(outboxStore.indexNames)).toEqual([
+      'by-entity',
+      'by-order',
+      'by-state',
+    ])
+    db.close()
+  })
+
+  it('atomically writes across workspace stores', async () => {
     await switchWorkspace({ kind: 'user', userId: 'local-db-atomic-success' })
     const local = transaction('atomic-success')
-    const pending = mutation(local)
 
-    await withWorkspaceWrite(['transactions', 'outbox'], async tx => {
+    await withWorkspaceWrite(['transactions', 'sync_meta'], async tx => {
       await tx.objectStore('transactions').put(local)
-      await tx.objectStore('outbox').put(pending)
+      await tx.objectStore('sync_meta').put({ key: 'atomic', value: 'committed' })
     })
 
     const db = await getActiveWorkspace()
     expect(await db.get('transactions', local.id)).toEqual(local)
-    expect(await outboxOps.pending()).toEqual([pending])
+    expect(await syncMetaOps.get('atomic')).toBe('committed')
   })
 
   it('rolls back every store when an atomic callback throws', async () => {
     await switchWorkspace({ kind: 'user', userId: 'local-db-atomic-failure' })
     const local = transaction('atomic-failure')
-    const pending = mutation(local)
 
-    await expect(withWorkspaceWrite(['transactions', 'outbox'], async tx => {
+    await expect(withWorkspaceWrite(['transactions', 'sync_meta'], async tx => {
       await tx.objectStore('transactions').put(local)
-      await tx.objectStore('outbox').put(pending)
+      await tx.objectStore('sync_meta').put({ key: 'atomic', value: 'rolled-back' })
       throw new Error('stop atomic write')
     })).rejects.toThrow('stop atomic write')
 
     const db = await getActiveWorkspace()
     expect(await db.get('transactions', local.id)).toBeUndefined()
-    expect(await outboxOps.pending()).toEqual([])
+    expect(await syncMetaOps.get('atomic')).toBeUndefined()
   })
 
-  it('keeps a pending local payload visible over an applied remote baseline', async () => {
-    await switchWorkspace({ kind: 'user', userId: 'local-db-overlay' })
-    const local = transaction('overlay', 'pending local note')
-    const remote = transaction('overlay', 'remote note')
-    await withWorkspaceWrite(['transactions', 'outbox'], async tx => {
-      await tx.objectStore('transactions').put(local)
-      await tx.objectStore('outbox').put(mutation(local))
-    })
-    const change: RemoteChange = {
-      sequence: 1,
-      entityType: 'transaction',
-      entityId: remote.id,
-      operation: 'upsert',
-      revision: 4,
-      record: remote,
-      deletedAt: null,
+  it('rejects duplicate operation IDs and keeps pending operations in enqueue order', async () => {
+    await switchWorkspace({ kind: 'user', userId: 'local-db-outbox-order' })
+    const first = operation(transaction('first'), 'same-operation')
+    const second = {
+      ...operation(transaction('second'), 'second-operation'),
+      createdAt: '2026-07-14T00:00:00.000Z',
     }
 
-    await applyRemoteChanges([change])
+    await outboxOps.add(first)
+    await expect(outboxOps.add({ ...first, payload: transaction('replacement') })).rejects.toThrow()
+    await outboxOps.add(second)
 
+    expect(await outboxOps.pending()).toEqual([first, second])
+    expect(await syncMetaOps.get('outbox_sequence')).toBe('2')
     const db = await getActiveWorkspace()
-    expect(await db.get('transactions', local.id)).toMatchObject(local)
-    expect(await outboxOps.pending()).toHaveLength(1)
+    expect((await db.get('outbox', first.operationId))?.enqueueOrder).toBe(1)
+    expect((await db.get('outbox', second.operationId))?.enqueueOrder).toBe(2)
   })
 
-  it('does not overlay a dead-letter payload over an applied remote baseline', async () => {
-    await switchWorkspace({ kind: 'user', userId: 'local-db-dead-letter' })
-    const local = transaction('dead-letter', 'failed local note')
-    const remote = transaction('dead-letter', 'remote note')
-    await withWorkspaceWrite(['transactions', 'outbox'], async tx => {
-      await tx.objectStore('transactions').put(local)
-      await tx.objectStore('outbox').put({ ...mutation(local), state: 'dead-letter' })
-    })
+  it('exposes a generation snapshot that becomes stale after switching accounts', async () => {
+    const firstId = { kind: 'user', userId: 'local-db-snapshot-first' } as const
+    await switchWorkspace(firstId)
+    const snapshot = await getWorkspaceSnapshot()
 
-    await applyRemoteChanges([{
-      sequence: 2,
-      entityType: 'transaction',
-      entityId: remote.id,
-      operation: 'upsert',
-      revision: 5,
-      record: remote,
-      deletedAt: null,
-    }])
+    expect(snapshot.id).toEqual(firstId)
+    expect(isWorkspaceCurrent(snapshot)).toBe(true)
 
-    const db = await getActiveWorkspace()
-    expect(await db.get('transactions', remote.id)).toMatchObject(remote)
+    await switchWorkspace({ kind: 'user', userId: 'local-db-snapshot-last' })
+
+    expect(isWorkspaceCurrent(snapshot)).toBe(false)
   })
 
   it('closes the previous active handle when switching workspaces', async () => {
@@ -199,5 +251,63 @@ describe('workspace database', () => {
 
     await expect(async () => previous.getAll('transactions')).rejects.toThrow()
     expect((await getActiveWorkspace()).name).toBe('kakeibo-user-local-db-switch-b')
+  })
+
+  it('does not let a delayed lazy anonymous open override a login switch', async () => {
+    const anonymousId = { kind: 'anonymous' } as const
+    const userId = { kind: 'user', userId: 'local-db-race-login' } as const
+    const anonymousDb = await openWorkspace(anonymousId)
+    const userDb = await openWorkspace(userId)
+    const anonymousOpen = deferred<typeof anonymousDb>()
+    const userOpen = deferred<typeof userDb>()
+    const restore = setWorkspaceOpenerForTests(id =>
+      id.kind === 'anonymous' ? anonymousOpen.promise : userOpen.promise,
+    )
+
+    try {
+      const lazyAnonymous = getActiveWorkspace()
+      await Promise.resolve()
+      const loginSwitch = switchWorkspace(userId)
+      await Promise.resolve()
+
+      userOpen.resolve(userDb)
+      await loginSwitch
+      anonymousOpen.resolve(anonymousDb)
+
+      expect((await lazyAnonymous).name).toBe(workspaceDbName(userId))
+      expect((await getActiveWorkspace()).name).toBe(workspaceDbName(userId))
+      await expect(async () => anonymousDb.getAll('transactions')).rejects.toThrow()
+    } finally {
+      restore()
+    }
+  })
+
+  it('makes the last concurrent switch win and closes the stale handle', async () => {
+    const firstId = { kind: 'user', userId: 'local-db-race-first' } as const
+    const lastId = { kind: 'user', userId: 'local-db-race-last' } as const
+    const firstDb = await openWorkspace(firstId)
+    const lastDb = await openWorkspace(lastId)
+    const firstOpen = deferred<typeof firstDb>()
+    const lastOpen = deferred<typeof lastDb>()
+    const restore = setWorkspaceOpenerForTests(id =>
+      id.kind === 'user' && id.userId === firstId.userId
+        ? firstOpen.promise
+        : lastOpen.promise,
+    )
+
+    try {
+      const firstSwitch = switchWorkspace(firstId)
+      const lastSwitch = switchWorkspace(lastId)
+
+      lastOpen.resolve(lastDb)
+      await lastSwitch
+      firstOpen.resolve(firstDb)
+      await firstSwitch
+
+      expect((await getActiveWorkspace()).name).toBe(workspaceDbName(lastId))
+      await expect(async () => firstDb.getAll('transactions')).rejects.toThrow()
+    } finally {
+      restore()
+    }
   })
 })

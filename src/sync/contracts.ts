@@ -1,44 +1,28 @@
 import type { BudgetRule, Category, Transaction } from '../types'
 
 export type EntityType = 'transaction' | 'category' | 'budget'
-export type MutationOperation = 'upsert' | 'delete' | 'restore'
+export type OperationKind = 'upsert' | 'delete'
 export type SyncPayload = Transaction | Category | BudgetRule
 
-export interface OutboxMutation {
-  mutationId: string
-  userId: string
-  deviceId: string
+export interface PendingOperation {
+  operationId: string
   entityType: EntityType
   entityId: string
-  operation: MutationOperation
-  baseRevision: number
+  operation: OperationKind
   payload: SyncPayload | null
   createdAt: string
   attemptCount: number
   nextAttemptAt: string
-  state: 'pending' | 'dead-letter'
+  state: 'pending' | 'isolated'
   lastError?: string
 }
 
-export interface RemoteChange {
-  sequence: number
+export interface CloudRecord {
   entityType: EntityType
   entityId: string
-  operation: MutationOperation
-  revision: number
   record: SyncPayload | null
+  updatedAt: string
   deletedAt: string | null
-}
-
-export interface RecoverableChange {
-  sequence: number
-  entityType: EntityType
-  entityId: string
-  reason: 'deleted' | 'overwritten'
-  record: SyncPayload
-  revision: number
-  createdAt: string
-  deviceId: string
 }
 
 export type SyncStatus =

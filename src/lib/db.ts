@@ -16,16 +16,19 @@ export const transactionOps = {
   },
 
   async addMany(txs: Transaction[]): Promise<{ added: number; skipped: number }> {
+    const db = await getDb()
+    const dbTx = db.transaction('transactions', 'readwrite')
+    const store = dbTx.objectStore('transactions')
     let added = 0, skipped = 0
     for (const tx of txs) {
       if (tx.externalId) {
-        const db = await getDb()
-        const existing = await db.getFromIndex('transactions', 'by-external', tx.externalId)
+        const existing = await store.index('by-external').get(tx.externalId)
         if (existing) { skipped++; continue }
       }
-      await transactionOps.add(tx)
+      await store.put(tx)
       added++
     }
+    await dbTx.done
     return { added, skipped }
   },
 

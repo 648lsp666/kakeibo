@@ -1,7 +1,7 @@
 import { openDB } from 'idb'
 import type { DBSchema, IDBPDatabase, IDBPTransaction } from 'idb'
 import type { BudgetRule, Category, Transaction } from '../types'
-import type { EntityType, OutboxMutation, RemoteChange, SyncPayload } from './contracts'
+import type { EntityType, PendingOperation } from './contracts'
 
 interface SyncConfigRow {
   key: string
@@ -17,7 +17,11 @@ interface BudgetRow extends BudgetRule {
   revision: number
 }
 
-export interface KakeiboSchemaV2 extends DBSchema {
+interface StoredPendingOperation extends PendingOperation {
+  enqueueOrder: number
+}
+
+export interface KakeiboSchemaV3 extends DBSchema {
   transactions: {
     key: string
     value: Transaction
@@ -32,8 +36,12 @@ export interface KakeiboSchemaV2 extends DBSchema {
   sync_config: { key: string; value: SyncConfigRow }
   outbox: {
     key: string
-    value: OutboxMutation
-    indexes: { 'by-state': OutboxMutation['state']; 'by-entity': [EntityType, string] }
+    value: StoredPendingOperation
+    indexes: {
+      'by-state': PendingOperation['state']
+      'by-entity': [EntityType, string]
+      'by-order': number
+    }
   }
   sync_meta: { key: string; value: SyncMetaRow }
 }
@@ -48,11 +56,17 @@ export type WorkspaceStore =
 
 export type WorkspaceId = { kind: 'anonymous' } | { kind: 'user'; userId: string }
 
+export interface WorkspaceSnapshot {
+  db: IDBPDatabase<KakeiboSchemaV3>
+  generation: number
+  id: WorkspaceId
+}
+
 export function workspaceDbName(id: WorkspaceId): string {
   return id.kind === 'anonymous' ? 'kakeibo' : `kakeibo-user-${id.userId}`
 }
 
-function createVersionOneStores(db: IDBPDatabase<KakeiboSchemaV2>): void {
+function createVersionOneStores(db: IDBPDatabase<KakeiboSchemaV3>): void {
   const transactions = db.createObjectStore('transactions', { keyPath: 'id' })
   transactions.createIndex('by-date', 'date')
   transactions.createIndex('by-external', 'externalId', { unique: false })
@@ -61,122 +75,237 @@ function createVersionOneStores(db: IDBPDatabase<KakeiboSchemaV2>): void {
   db.createObjectStore('sync_config', { keyPath: 'key' })
 }
 
-export async function openWorkspace(id: WorkspaceId): Promise<IDBPDatabase<KakeiboSchemaV2>> {
-  return openDB<KakeiboSchemaV2>(workspaceDbName(id), 2, {
+function createVersionThreeOutbox(db: IDBPDatabase<KakeiboSchemaV3>): void {
+  const outbox = db.createObjectStore('outbox', { keyPath: 'operationId' })
+  outbox.createIndex('by-state', 'state')
+  outbox.createIndex('by-entity', ['entityType', 'entityId'])
+  outbox.createIndex('by-order', 'enqueueOrder')
+}
+
+export async function openWorkspace(id: WorkspaceId): Promise<IDBPDatabase<KakeiboSchemaV3>> {
+  return openDB<KakeiboSchemaV3>(workspaceDbName(id), 3, {
     upgrade(db, oldVersion, _newVersion, tx) {
       if (oldVersion < 1) createVersionOneStores(db)
-      if (oldVersion >= 2) return
 
-      db.createObjectStore('budgets', { keyPath: 'id' })
-      const outbox = db.createObjectStore('outbox', { keyPath: 'mutationId' })
-      outbox.createIndex('by-state', 'state')
-      outbox.createIndex('by-entity', ['entityType', 'entityId'])
-      db.createObjectStore('sync_meta', { keyPath: 'key' })
+      if (oldVersion < 2) {
+        db.createObjectStore('budgets', { keyPath: 'id' })
+        db.createObjectStore('sync_meta', { keyPath: 'key' })
 
-      const config = tx.objectStore('sync_config')
-      const budgets = tx.objectStore('budgets')
-      void config.get('budgets').then(async legacy => {
-        if (!legacy) return
+        const config = tx.objectStore('sync_config')
+        const budgets = tx.objectStore('budgets')
+        void config.get('budgets').then(async legacy => {
+          if (!legacy) return
 
-        let rules: BudgetRule[]
-        try {
-          rules = JSON.parse(legacy.value) as BudgetRule[]
-          if (!Array.isArray(rules)) return
-        } catch {
-          return
-        }
+          let rules: BudgetRule[]
+          try {
+            rules = JSON.parse(legacy.value) as BudgetRule[]
+            if (!Array.isArray(rules)) return
+          } catch {
+            return
+          }
 
-        for (const rule of rules) {
-          await budgets.put({ ...rule, revision: 0 })
-        }
-        await config.delete('budgets')
-      })
+          for (const rule of rules) {
+            await budgets.put({ ...rule, revision: 0 })
+          }
+          await config.delete('budgets')
+        })
+      }
+
+      if (oldVersion < 3) {
+        if (db.objectStoreNames.contains('outbox')) db.deleteObjectStore('outbox')
+        createVersionThreeOutbox(db)
+      }
     },
   })
 }
 
-let activeWorkspace: IDBPDatabase<KakeiboSchemaV2> | null = null
-let openingWorkspace: Promise<IDBPDatabase<KakeiboSchemaV2>> | null = null
+type WorkspaceOpener = (id: WorkspaceId) => Promise<IDBPDatabase<KakeiboSchemaV3>>
 
-export async function switchWorkspace(id: WorkspaceId): Promise<void> {
+interface OpeningWorkspace {
+  generation: number
+  id: WorkspaceId
+  promise: Promise<IDBPDatabase<KakeiboSchemaV3> | null>
+}
+
+let activeWorkspace: IDBPDatabase<KakeiboSchemaV3> | null = null
+let activeWorkspaceId: WorkspaceId | null = null
+let targetWorkspaceId: WorkspaceId | null = null
+let workspaceGeneration = 0
+let openingWorkspace: OpeningWorkspace | null = null
+let workspaceOpener: WorkspaceOpener = openWorkspace
+
+function sameWorkspace(left: WorkspaceId | null, right: WorkspaceId): boolean {
+  if (!left || left.kind !== right.kind) return false
+  return left.kind === 'anonymous'
+    || left.userId === (right as Extract<WorkspaceId, { kind: 'user' }>).userId
+}
+
+function resetWorkspaceState(): void {
+  workspaceGeneration++
+  targetWorkspaceId = null
+  activeWorkspaceId = null
   activeWorkspace?.close()
   activeWorkspace = null
   openingWorkspace = null
-
-  const db = await openWorkspace(id)
-  activeWorkspace = db
 }
 
-export async function getActiveWorkspace(): Promise<IDBPDatabase<KakeiboSchemaV2>> {
-  if (activeWorkspace) return activeWorkspace
-  if (!openingWorkspace) openingWorkspace = openWorkspace({ kind: 'anonymous' })
+async function openTarget(
+  id: WorkspaceId,
+  generation: number,
+): Promise<IDBPDatabase<KakeiboSchemaV3> | null> {
+  if (openingWorkspace?.generation === generation && sameWorkspace(openingWorkspace.id, id)) {
+    return openingWorkspace.promise
+  }
 
-  try {
-    activeWorkspace = await openingWorkspace
-    return activeWorkspace
-  } finally {
-    openingWorkspace = null
+  const promise = workspaceOpener(id)
+    .then(db => {
+      if (workspaceGeneration !== generation || !sameWorkspace(targetWorkspaceId, id)) {
+        db.close()
+        return null
+      }
+
+      activeWorkspace?.close()
+      activeWorkspace = db
+      activeWorkspaceId = id
+      return db
+    })
+    .catch(error => {
+      if (workspaceGeneration !== generation || !sameWorkspace(targetWorkspaceId, id)) return null
+      throw error
+    })
+    .finally(() => {
+      if (openingWorkspace?.generation === generation) openingWorkspace = null
+    })
+
+  openingWorkspace = { generation, id, promise }
+  return promise
+}
+
+export async function switchWorkspace(id: WorkspaceId): Promise<void> {
+  const generation = ++workspaceGeneration
+  targetWorkspaceId = id
+  activeWorkspace?.close()
+  activeWorkspace = null
+  activeWorkspaceId = null
+
+  await openTarget(id, generation)
+}
+
+export async function getActiveWorkspace(): Promise<IDBPDatabase<KakeiboSchemaV3>> {
+  while (true) {
+    if (activeWorkspace && targetWorkspaceId && sameWorkspace(activeWorkspaceId, targetWorkspaceId)) {
+      return activeWorkspace
+    }
+
+    if (!targetWorkspaceId) {
+      targetWorkspaceId = { kind: 'anonymous' }
+      workspaceGeneration++
+    }
+
+    const id = targetWorkspaceId
+    const generation = workspaceGeneration
+    const db = await openTarget(id, generation)
+    if (db) return db
+  }
+}
+
+export async function getWorkspaceSnapshot(): Promise<WorkspaceSnapshot> {
+  const db = await getActiveWorkspace()
+  if (!activeWorkspaceId) throw new Error('Active workspace has no identity')
+  return { db, generation: workspaceGeneration, id: activeWorkspaceId }
+}
+
+export function isWorkspaceCurrent(snapshot: WorkspaceSnapshot): boolean {
+  return snapshot.db === activeWorkspace
+    && snapshot.generation === workspaceGeneration
+    && sameWorkspace(activeWorkspaceId, snapshot.id)
+}
+
+export function setWorkspaceOpenerForTests(opener: WorkspaceOpener): () => void {
+  resetWorkspaceState()
+  workspaceOpener = opener
+  return () => {
+    resetWorkspaceState()
+    workspaceOpener = openWorkspace
   }
 }
 
 export async function withWorkspaceWrite<T, Stores extends Array<WorkspaceStore>>(
   stores: Stores,
-  run: (
-    tx: IDBPTransaction<
-      KakeiboSchemaV2,
-      Stores,
-      'readwrite'
-    >,
-  ) => Promise<T>,
+  run: (tx: IDBPTransaction<KakeiboSchemaV3, Stores, 'readwrite'>) => Promise<T>,
 ): Promise<T> {
   const db = await getActiveWorkspace()
   const tx = db.transaction(stores, 'readwrite')
+  const completion = tx.done.then(
+    () => ({ ok: true as const }),
+    error => ({ ok: false as const, error }),
+  )
 
   try {
     const result = await run(tx)
-    await tx.done
+    const completed = await completion
+    if (!completed.ok) throw completed.error
     return result
   } catch (error) {
     try {
       tx.abort()
-      await tx.done
     } catch {
-      // Preserve the callback or request error that caused the rollback.
+      // The transaction may already have aborted after a failed request.
     }
+    await completion
     throw error
   }
 }
 
+function withoutEnqueueOrder(operation: StoredPendingOperation): PendingOperation {
+  const { enqueueOrder: _enqueueOrder, ...pending } = operation
+  return pending
+}
+
 export const outboxOps = {
-  async put(mutation: OutboxMutation): Promise<void> {
+  async put(operation: PendingOperation): Promise<void> {
     const db = await getActiveWorkspace()
-    await db.put('outbox', mutation)
+    const existing = await db.get('outbox', operation.operationId)
+    if (existing) {
+      await db.put('outbox', { ...operation, enqueueOrder: existing.enqueueOrder })
+      return
+    }
+    await outboxOps.add(operation)
   },
 
-  async add(mutation: OutboxMutation): Promise<void> {
-    await outboxOps.put(mutation)
+  async add(operation: PendingOperation): Promise<void> {
+    await withWorkspaceWrite(['outbox', 'sync_meta'], async tx => {
+      const meta = tx.objectStore('sync_meta')
+      const current = await meta.get('outbox_sequence')
+      const enqueueOrder = Number.parseInt(current?.value ?? '0', 10) + 1
+      await tx.objectStore('outbox').add({ ...operation, enqueueOrder })
+      await meta.put({ key: 'outbox_sequence', value: String(enqueueOrder) })
+    })
   },
 
-  async get(mutationId: string): Promise<OutboxMutation | undefined> {
+  async get(operationId: string): Promise<PendingOperation | undefined> {
     const db = await getActiveWorkspace()
-    return db.get('outbox', mutationId)
+    const operation = await db.get('outbox', operationId)
+    return operation && withoutEnqueueOrder(operation)
   },
 
-  async pending(limit?: number): Promise<OutboxMutation[]> {
+  async pending(limit?: number): Promise<PendingOperation[]> {
     const db = await getActiveWorkspace()
-    const pending = await db.getAllFromIndex('outbox', 'by-state', 'pending')
-    pending.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    const operations = await db.getAllFromIndex('outbox', 'by-order')
+    const pending = operations
+      .filter(operation => operation.state === 'pending')
+      .map(withoutEnqueueOrder)
     return limit === undefined ? pending : pending.slice(0, limit)
   },
 
-  async list(): Promise<OutboxMutation[]> {
+  async list(): Promise<PendingOperation[]> {
     const db = await getActiveWorkspace()
-    return db.getAll('outbox')
+    return (await db.getAllFromIndex('outbox', 'by-order')).map(withoutEnqueueOrder)
   },
 
-  async delete(mutationId: string): Promise<void> {
+  async delete(operationId: string): Promise<void> {
     const db = await getActiveWorkspace()
-    await db.delete('outbox', mutationId)
+    await db.delete('outbox', operationId)
   },
 
   async countPending(): Promise<number> {
@@ -206,47 +335,4 @@ export const syncMetaOps = {
     const db = await getActiveWorkspace()
     await db.delete('sync_meta', key)
   },
-}
-
-function storeFor(entityType: EntityType): 'transactions' | 'categories' | 'budgets' {
-  if (entityType === 'transaction') return 'transactions'
-  if (entityType === 'category') return 'categories'
-  return 'budgets'
-}
-
-function rowFor(entityType: EntityType, payload: SyncPayload, revision: number): SyncPayload | BudgetRow {
-  return entityType === 'budget' ? { ...payload as BudgetRule, revision } : payload
-}
-
-export async function applyRemoteChanges(changes: RemoteChange[]): Promise<void> {
-  await withWorkspaceWrite(
-    ['transactions', 'categories', 'budgets', 'outbox'],
-    async tx => {
-      for (const change of changes) {
-        const storeName = storeFor(change.entityType)
-        const store = tx.objectStore(storeName) as IDBPTransaction<KakeiboSchemaV2, ['transactions'], 'readwrite'>['store']
-        if (change.record && change.operation !== 'delete') {
-          await store.put(rowFor(change.entityType, change.record, change.revision) as Transaction)
-        } else {
-          await store.delete(change.entityId)
-        }
-
-        const entityMutations = await tx.objectStore('outbox').index('by-entity').getAll([
-          change.entityType,
-          change.entityId,
-        ])
-        const pending = entityMutations
-          .filter(mutation => mutation.state === 'pending')
-          .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-
-        for (const mutation of pending) {
-          if (mutation.payload && mutation.operation !== 'delete') {
-            await store.put(rowFor(change.entityType, mutation.payload, change.revision) as Transaction)
-          } else {
-            await store.delete(change.entityId)
-          }
-        }
-      }
-    },
-  )
 }
