@@ -99,6 +99,8 @@ declare
   current_updated_at timestamptz;
   current_deleted_at timestamptz;
   current_found boolean;
+  receipt_entity_type text;
+  receipt_entity_id text;
 begin
   if current_user_id is null then
     raise exception using errcode = '42501', message = 'authentication required';
@@ -151,18 +153,30 @@ begin
   get diagnostics inserted = row_count;
 
   if inserted = 0 then
+    select applied.entity_type, applied.entity_id
+      into receipt_entity_type, receipt_entity_id
+      from public.applied_operations as applied
+     where applied.user_id = current_user_id
+       and applied.operation_id = p_operation_id;
+
+    entity_table := case receipt_entity_type
+      when 'transaction' then 'public.transactions'::pg_catalog.regclass
+      when 'category' then 'public.categories'::pg_catalog.regclass
+      when 'budget' then 'public.budgets'::pg_catalog.regclass
+    end;
+
     execute pg_catalog.format(
       'select payload, updated_at, deleted_at from %s where user_id = $1 and id = $2',
       entity_table
     )
     into current_payload, current_updated_at, current_deleted_at
-    using current_user_id, p_entity_id;
+    using current_user_id, receipt_entity_id;
 
     return pg_catalog.jsonb_build_object(
       'operation_id', p_operation_id,
       'status', 'duplicate',
-      'entity_type', p_entity_type,
-      'entity_id', p_entity_id,
+      'entity_type', receipt_entity_type,
+      'entity_id', receipt_entity_id,
       'record', current_payload,
       'updated_at', current_updated_at,
       'deleted_at', current_deleted_at
@@ -193,8 +207,8 @@ begin
   if p_operation = 'upsert' then
     if p_entity_type = 'transaction'
        and coalesce(p_payload->>'externalId', '') <> '' then
-      select existing.payload, existing.updated_at, existing.deleted_at
-        into current_payload, current_updated_at, current_deleted_at
+      select existing.id, existing.payload, existing.updated_at, existing.deleted_at
+        into receipt_entity_id, current_payload, current_updated_at, current_deleted_at
         from public.transactions as existing
        where existing.user_id = current_user_id
          and existing.id <> p_entity_id
@@ -203,11 +217,16 @@ begin
        for update;
 
       if found then
+        update public.applied_operations
+           set entity_id = receipt_entity_id
+         where user_id = current_user_id
+           and operation_id = p_operation_id;
+
         return pg_catalog.jsonb_build_object(
           'operation_id', p_operation_id,
           'status', 'deduplicated',
           'entity_type', p_entity_type,
-          'entity_id', p_entity_id,
+          'entity_id', receipt_entity_id,
           'record', current_payload,
           'updated_at', current_updated_at,
           'deleted_at', current_deleted_at

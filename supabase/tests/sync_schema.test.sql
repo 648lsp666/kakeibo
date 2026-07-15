@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(18);
+select plan(20);
 
 set local request.jwt.claim.sub = '';
 set local role postgres;
@@ -20,6 +20,18 @@ select is((public.apply_operation('op-1','transaction','tx-1','upsert',
 select is((public.apply_operation('op-1','transaction','tx-1','upsert',
   '{"id":"tx-1","amount":999,"externalId":"ext-1"}'::jsonb))->>'status', 'duplicate');
 select is((select payload->>'amount' from public.transactions where id='tx-1'), '12');
+
+select ok(
+  (public.apply_operation('op-1','category','retry-target','upsert',
+    '{"id":"retry-target","name":"Wrong target"}'::jsonb))->>'status' = 'duplicate'
+  and (public.apply_operation('op-1','category','retry-target','upsert',
+    '{"id":"retry-target","name":"Wrong target"}'::jsonb))->>'entity_type' = 'transaction'
+  and (public.apply_operation('op-1','category','retry-target','upsert',
+    '{"id":"retry-target","name":"Wrong target"}'::jsonb))->>'entity_id' = 'tx-1'
+  and (public.apply_operation('op-1','category','retry-target','upsert',
+    '{"id":"retry-target","name":"Wrong target"}'::jsonb))->'record'->>'amount' = '12',
+  'a duplicate operation remains bound to its first entity target'
+);
 
 select is((public.apply_operation('op-2','transaction','tx-1','upsert',
   '{"id":"tx-1","amount":18,"externalId":"ext-1"}'::jsonb))->>'status', 'applied');
@@ -99,6 +111,16 @@ select is(
     '{"id":"tx-duplicate","amount":99,"externalId":"shared-external-id"}'::jsonb))->>'status',
   'deduplicated',
   'duplicate external IDs return deduplicated status'
+);
+
+select ok(
+  (public.apply_operation('external-duplicate','transaction','tx-duplicate','upsert',
+    '{"id":"tx-duplicate","amount":101,"externalId":"shared-external-id"}'::jsonb))->>'status' = 'duplicate'
+  and (public.apply_operation('external-duplicate','transaction','tx-duplicate','upsert',
+    '{"id":"tx-duplicate","amount":101,"externalId":"shared-external-id"}'::jsonb))->>'entity_id' = 'tx-original'
+  and (public.apply_operation('external-duplicate','transaction','tx-duplicate','upsert',
+    '{"id":"tx-duplicate","amount":101,"externalId":"shared-external-id"}'::jsonb))->'record'->>'id' = 'tx-original',
+  'a deduplicated operation retry returns the canonical transaction'
 );
 
 select is(
