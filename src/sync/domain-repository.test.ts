@@ -161,6 +161,66 @@ describe('domain repository local writes', () => {
     expect(await db.get('transactions', existing.id)).toEqual(existing)
     expect(await outboxOps.list()).toEqual([])
   })
+
+  it('removes all account transactions and enqueues their deletes atomically', async () => {
+    const first = transaction('remove-all-first')
+    const second = transaction('remove-all-second')
+    const db = await getActiveWorkspace()
+    await db.put('transactions', first)
+    await db.put('transactions', second)
+
+    await domainRepository.removeAllTransactions()
+
+    expect(await db.getAll('transactions')).toEqual([])
+    expect(await outboxOps.pending()).toEqual([
+      expect.objectContaining({ entityId: first.id, operation: 'delete' }),
+      expect.objectContaining({ entityId: second.id, operation: 'delete' }),
+    ])
+    expect((await db.get('outbox', (await outboxOps.pending())[0].operationId))?.enqueueOrder).toBe(1)
+    expect((await db.get('outbox', (await outboxOps.pending())[1].operationId))?.enqueueOrder).toBe(2)
+  })
+
+  it('never clears or enqueues into a newly selected account during remove-all', async () => {
+    const accountA = { kind: 'user', userId: `remove-all-a-${workspace++}` } as const
+    const accountB = { kind: 'user', userId: `remove-all-b-${workspace++}` } as const
+    await switchWorkspace(accountA)
+    const dbA = await getActiveWorkspace()
+    const first = transaction('account-a-first')
+    const second = transaction('account-a-second')
+    await dbA.put('transactions', first)
+    await dbA.put('transactions', second)
+
+    let switchPromise: Promise<void> | undefined
+    let operation = 0
+    const repository = createDomainRepository({
+      operationId: () => {
+        if (operation++ === 0) switchPromise = switchWorkspace(accountB)
+        return `remove-all-operation-${operation}`
+      },
+    })
+
+    const clearResult = repository.removeAllTransactions().then(
+      () => ({ kind: 'completed' as const }),
+      error => ({ kind: 'rolled-back' as const, error }),
+    )
+    const result = await clearResult
+    await switchPromise
+
+    const dbB = await getActiveWorkspace()
+    expect(await dbB.getAll('transactions')).toEqual([])
+    expect(await dbB.getAll('outbox')).toEqual([])
+
+    await switchWorkspace(accountA)
+    const reopenedA = await getActiveWorkspace()
+    if (result.kind === 'completed') {
+      expect(await reopenedA.getAll('transactions')).toEqual([])
+      expect(await reopenedA.count('outbox')).toBe(2)
+    } else {
+      expect(result.error).toBeDefined()
+      expect(await reopenedA.getAll('transactions')).toEqual([first, second])
+      expect(await reopenedA.getAll('outbox')).toEqual([])
+    }
+  })
 })
 
 describe('domain repository cloud application', () => {
@@ -202,6 +262,39 @@ describe('domain repository cloud application', () => {
 
     const db = await getActiveWorkspace()
     expect(await db.get('transactions', remote.id)).toEqual(remote)
+  })
+
+  it('ignores a cloud upsert that claims to be a system category', async () => {
+    const system = category('cloud-system-upsert', true)
+
+    await domainRepository.applyCloudRecords([{
+      entityType: 'category',
+      entityId: system.id,
+      record: system,
+      updatedAt: '2026-07-15T01:00:00.000Z',
+      deletedAt: null,
+    }])
+
+    const db = await getActiveWorkspace()
+    expect(await db.get('categories', system.id)).toBeUndefined()
+    expect(await outboxOps.list()).toEqual([])
+  })
+
+  it('ignores a cloud tombstone for a local system category', async () => {
+    const system = category('cloud-system-tombstone', true)
+    const db = await getActiveWorkspace()
+    await db.put('categories', system)
+
+    await domainRepository.applyCloudRecords([{
+      entityType: 'category',
+      entityId: system.id,
+      record: null,
+      updatedAt: '2026-07-15T01:00:00.000Z',
+      deletedAt: '2026-07-15T01:00:00.000Z',
+    }])
+
+    expect(await db.get('categories', system.id)).toEqual(system)
+    expect(await outboxOps.list()).toEqual([])
   })
 
   it('exports only domain data and strips local budget metadata', async () => {

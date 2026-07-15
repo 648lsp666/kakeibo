@@ -13,6 +13,7 @@ export interface DomainSnapshot {
 export interface DomainRepository {
   upsert(entityType: EntityType, payload: SyncPayload): Promise<void>
   remove(entityType: EntityType, entityId: string): Promise<void>
+  removeAllTransactions(): Promise<void>
   importTransactions(records: Transaction[]): Promise<{ added: number; skipped: number }>
   applyCloudRecords(records: CloudRecord[]): Promise<void>
   exportSnapshot(): Promise<DomainSnapshot>
@@ -106,6 +107,60 @@ export function createDomainRepository(options: DomainRepositoryOptions = {}): D
       if (synced) emitSyncWake('local-write')
     },
 
+    async removeAllTransactions() {
+      const snapshot = await getWorkspaceSnapshot()
+
+      if (snapshot.id.kind === 'anonymous') {
+        const tx = snapshot.db.transaction('transactions', 'readwrite')
+        await tx.store.clear()
+        await tx.done
+        return
+      }
+
+      const tx = snapshot.db.transaction(['transactions', 'outbox', 'sync_meta'], 'readwrite')
+      const completion = tx.done.then(
+        () => ({ ok: true as const }),
+        error => ({ ok: false as const, error }),
+      )
+      let removed = 0
+
+      try {
+        const transactions = tx.objectStore('transactions')
+        const outbox = tx.objectStore('outbox')
+        const meta = tx.objectStore('sync_meta')
+        const records = await transactions.getAll()
+        const current = await meta.get('outbox_sequence')
+        let enqueueOrder = Number.parseInt(current?.value ?? '0', 10)
+
+        for (const record of records) {
+          await transactions.delete(record.id)
+          enqueueOrder++
+          await outbox.add({
+            ...pendingOperation('transaction', record.id, 'delete', null),
+            enqueueOrder,
+          })
+          removed++
+        }
+
+        if (removed > 0) {
+          await meta.put({ key: 'outbox_sequence', value: String(enqueueOrder) })
+        }
+
+        const completed = await completion
+        if (!completed.ok) throw completed.error
+      } catch (error) {
+        try {
+          tx.abort()
+        } catch {
+          // The transaction may already be aborted after a workspace switch.
+        }
+        await completion
+        throw error
+      }
+
+      if (removed > 0) emitSyncWake('local-write')
+    },
+
     async importTransactions(records) {
       const result = await withWorkspaceWrite(
         ['transactions', 'outbox', 'sync_meta'],
@@ -152,6 +207,13 @@ export function createDomainRepository(options: DomainRepositoryOptions = {}): D
 
       for (const cloudRecord of records) {
         const store = tx.objectStore(storeName(cloudRecord.entityType))
+        if (cloudRecord.entityType === 'category') {
+          if (cloudRecord.record && (cloudRecord.record as Category).isSystem) continue
+          if (cloudRecord.deletedAt || !cloudRecord.record) {
+            const existing = await tx.objectStore('categories').get(cloudRecord.entityId)
+            if (existing?.isSystem) continue
+          }
+        }
         if (cloudRecord.deletedAt || !cloudRecord.record) {
           await store.delete(cloudRecord.entityId)
         } else {

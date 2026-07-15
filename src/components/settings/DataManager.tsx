@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { transactionOps, categoryOps, getDb } from '../../lib/db'
+import { transactionOps, categoryOps } from '../../lib/db'
 import { seedCategories } from '../../lib/seed'
 import { ConfirmDialog, InlineNotice } from '../ui/Feedback'
 import { Icon } from '../ui/Icon'
@@ -29,15 +29,7 @@ export function DataManager() {
   const handleClear = async () => {
     setClearing(true)
     try {
-      const db = await getDb()
-      if (!db.name?.startsWith('kakeibo-user-')) {
-        await db.clear('transactions')
-      } else {
-        const transactions = await transactionOps.getAll()
-        for (const transaction of transactions) {
-          await domainRepository.remove('transaction', transaction.id)
-        }
-      }
+      await domainRepository.removeAllTransactions()
       await seedCategories()
       setConfirmOpen(false)
       setCleared(true)
