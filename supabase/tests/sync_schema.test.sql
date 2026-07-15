@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(68);
+select plan(69);
 
 insert into public.transactions (
   user_id, id, payload, last_mutation_id, last_device_id
@@ -565,6 +565,16 @@ select is(
   ))))->0->>'status',
   'rejected_deleted',
   'a permanent deletion fingerprint rejects an ordinary recreation'
+);
+
+select is(
+  (public.apply_mutations(jsonb_build_array(jsonb_build_object(
+    'mutation_id','expired-recreate-nonzero','device_id','device-a','entity_type','transaction',
+    'entity_id','expired-tombstone','operation','upsert','base_revision',99,
+    'payload',jsonb_build_object('id','expired-tombstone','amount',7)
+  ))))->0->>'status',
+  'rejected_deleted',
+  'a permanent deletion fingerprint outranks a nonzero missing-row base revision'
 );
 
 select is(

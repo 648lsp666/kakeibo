@@ -131,20 +131,24 @@ begin
       get diagnostics affected_rows = row_count;
       current_found := affected_rows > 0;
 
-      if (current_found and base_revision > current_revision)
+      if operation = 'upsert'
+         and not current_found
+         and exists (
+           select 1
+             from public.deletion_registry registry
+            where registry.user_id = current_user_id
+              and registry.entity_type = entity_type
+              and registry.entity_id = entity_id
+         ) then
+        status := 'rejected_deleted';
+
+      elsif (current_found and base_revision > current_revision)
          or (not current_found and base_revision <> 0) then
         status := 'invalid';
 
-      elsif operation = 'upsert' and (
-        (current_found and current_deleted_at is not null)
-        or exists (
-          select 1
-            from public.deletion_registry registry
-           where registry.user_id = current_user_id
-             and registry.entity_type = entity_type
-             and registry.entity_id = entity_id
-        )
-      ) then
+      elsif operation = 'upsert'
+         and current_found
+         and current_deleted_at is not null then
         status := 'rejected_deleted';
         next_revision := current_revision;
         record := current_payload;
