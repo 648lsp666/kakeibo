@@ -154,6 +154,7 @@ describe('AuthSyncProvider', () => {
     })
     mocks.countPending.mockImplementation(async () => rowsFor(mocks.active).outbox.filter(row => row.state === 'pending').length)
     mocks.createTransport.mockReturnValue({})
+    mocks.createEngine.mockReset()
     mocks.createEngine.mockReturnValue({ start: vi.fn().mockResolvedValue(undefined), stop: vi.fn().mockResolvedValue(undefined), wake: vi.fn() })
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:backup')
@@ -250,6 +251,55 @@ describe('AuthSyncProvider', () => {
     expect(rows.transactions).toHaveLength(1)
     expect(rows.outbox).toHaveLength(1)
     expect(rows.sync_meta.filter(row => row.key === markerKey('user-1'))).toHaveLength(1)
+  })
+
+  it('recovers behind the workspace gate when confirm persisted the marker but engine start fails', async () => {
+    const client = createAuthClient(session())
+    const failed = { start: vi.fn().mockRejectedValue(new Error('confirm engine failed')), stop: vi.fn().mockResolvedValue(undefined), wake: vi.fn() }
+    const recovered = { start: vi.fn().mockResolvedValue(undefined), stop: vi.fn().mockResolvedValue(undefined), wake: vi.fn() }
+    mocks.getClient.mockReturnValue(client as any)
+    mocks.createEngine.mockReturnValueOnce(failed).mockReturnValueOnce(recovered)
+    mocks.exportSnapshot.mockResolvedValue({ transactions: [{ id: 'tx-1' }], categories: [], budgets: [] } as any)
+    render(<AuthSyncProvider><Harness /></AuthSyncProvider>)
+    await waitFor(() => expect(screen.getByTestId('migration')).toHaveTextContent('true'))
+
+    await userEvent.click(screen.getByRole('button', { name: 'confirm' }))
+
+    await waitFor(() => expect(mocks.setStatus).toHaveBeenCalledWith(expect.objectContaining({ message: 'confirm engine failed' })))
+    expect(rowsFor({ kind: 'user', userId: 'user-1' }).sync_meta).toContainEqual({ key: markerKey('user-1'), value: 'complete' })
+    expect(failed.stop).toHaveBeenCalledOnce()
+    expect(mocks.active).toEqual({ kind: 'anonymous' })
+    expect(screen.getByTestId('loading')).toHaveTextContent('true')
+    expect(screen.getByTestId('migration')).toHaveTextContent('false')
+
+    await userEvent.click(screen.getByRole('button', { name: 'retry' }))
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+    expect(mocks.active).toEqual({ kind: 'user', userId: 'user-1' })
+    expect(recovered.start).toHaveBeenCalledOnce()
+  })
+
+  it('recovers behind the workspace gate when skip persisted the marker but engine start fails', async () => {
+    const client = createAuthClient(session())
+    const failed = { start: vi.fn().mockRejectedValue(new Error('skip engine failed')), stop: vi.fn().mockResolvedValue(undefined), wake: vi.fn() }
+    const recovered = { start: vi.fn().mockResolvedValue(undefined), stop: vi.fn().mockResolvedValue(undefined), wake: vi.fn() }
+    mocks.getClient.mockReturnValue(client as any)
+    mocks.createEngine.mockReturnValueOnce(failed).mockReturnValueOnce(recovered)
+    render(<AuthSyncProvider><Harness /></AuthSyncProvider>)
+    await waitFor(() => expect(screen.getByTestId('migration')).toHaveTextContent('true'))
+
+    await userEvent.click(screen.getByRole('button', { name: 'skip' }))
+
+    await waitFor(() => expect(mocks.setStatus).toHaveBeenCalledWith(expect.objectContaining({ message: 'skip engine failed' })))
+    expect(rowsFor({ kind: 'user', userId: 'user-1' }).sync_meta).toContainEqual({ key: markerKey('user-1'), value: 'skipped' })
+    expect(failed.stop).toHaveBeenCalledOnce()
+    expect(mocks.active).toEqual({ kind: 'anonymous' })
+    expect(screen.getByTestId('loading')).toHaveTextContent('true')
+    expect(screen.getByTestId('migration')).toHaveTextContent('false')
+
+    await userEvent.click(screen.getByRole('button', { name: 'retry' }))
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+    expect(mocks.active).toEqual({ kind: 'user', userId: 'user-1' })
+    expect(recovered.start).toHaveBeenCalledOnce()
   })
 
   it('serializes A confirmation before a queued B auth transition', async () => {

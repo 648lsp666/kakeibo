@@ -378,21 +378,27 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
         await transition(accountSession, token)
         return
       }
+      let markerDurable = false
       try {
         const migration = createAnonymousMigrationService(id => assertTargetWorkspace(token, id))
         await migration.commit(pending.userId, pending.snapshot)
+        markerDurable = true
         if (!ownsAction(token)) return
         pendingMigrationRef.current = null
         if (mayExposeAction(token)) await startAccount(accountSession, token, true)
       } catch (error) {
         if (!mayExposeAction(token)) return
+        if (markerDurable) {
+          await recoverLifecycle(accountSession, token, error)
+          return
+        }
         setSession(accountSession)
         setMigrationRequired(true)
         setLoading(false)
         useSyncStore.getState().setStatus({ kind: 'error', pending: 0, message: message(error) })
       }
     })
-  }, [assertTargetWorkspace, enqueueAction, mayExposeAction, ownsAction, session, startAccount, transition])
+  }, [assertTargetWorkspace, enqueueAction, mayExposeAction, ownsAction, recoverLifecycle, session, startAccount, transition])
 
   const skipMigration = useCallback(() => {
     const effect = activeEffectRef.current
@@ -400,20 +406,26 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
     if (!effect || !accountSession) return Promise.resolve()
     return enqueueAction(effect, async token => {
       token.userId = accountSession.user.id
+      let markerDurable = false
       try {
         const migration = createAnonymousMigrationService(id => assertTargetWorkspace(token, id))
         await migration.markSkipped(accountSession.user.id)
+        markerDurable = true
         if (!ownsAction(token)) return
         pendingMigrationRef.current = null
         if (mayExposeAction(token)) await startAccount(accountSession, token, true)
       } catch (error) {
         if (!mayExposeAction(token)) return
+        if (markerDurable) {
+          await recoverLifecycle(accountSession, token, error)
+          return
+        }
         setLoading(false)
         setMigrationRequired(true)
         useSyncStore.getState().setStatus({ kind: 'error', pending: 0, message: message(error) })
       }
     })
-  }, [assertTargetWorkspace, enqueueAction, mayExposeAction, ownsAction, session, startAccount])
+  }, [assertTargetWorkspace, enqueueAction, mayExposeAction, ownsAction, recoverLifecycle, session, startAccount])
 
   const prepareSignOut = useCallback(async () => {
     if (!session) return 0

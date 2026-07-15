@@ -88,7 +88,9 @@ describe('CloudSyncCard', () => {
     const user = userEvent.setup()
     render(<CloudSyncCard />)
 
-    await user.click(screen.getByRole('button', { name: '关闭' }))
+    const close = screen.getByRole('button', { name: '关闭' })
+    expect(close).toBeDisabled()
+    await user.click(close)
     expect(mocks.auth.skipMigration).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog', { name: '合并本地账本？' })).toBeInTheDocument()
 

@@ -135,7 +135,7 @@ export function CloudSyncCard() {
         title="合并本地账本？"
         description="继续前已生成一份本地 JSON 备份。确认后会保留原有记录 ID，并开始账号同步。"
         busy={busy || auth.loading}
-        closeDisabled={busy || auth.loading}
+        closeDisabled={auth.migrationRequired || busy || auth.loading}
         onClose={() => undefined}
         footer={
           <div style={{ display: 'flex', gap: 10 }}>
