@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(59);
+select plan(68);
 
 insert into public.transactions (
   user_id, id, payload, last_mutation_id, last_device_id
@@ -138,6 +138,38 @@ select is(
 
 select is(
   (public.apply_mutations(jsonb_build_array(jsonb_build_object(
+    'mutation_id','future-existing','device_id','device-a','entity_type','transaction',
+    'entity_id','tx-1','operation','upsert','base_revision',3,
+    'payload',jsonb_build_object('id','tx-1','amount',88,'externalId','ext-1')
+  ))))->0->>'status',
+  'invalid',
+  'an upsert cannot claim a future revision for an existing record'
+);
+
+select is(
+  (select revision from public.transactions where id = 'tx-1'),
+  2::bigint,
+  'a future revision leaves an existing record unchanged'
+);
+
+select is(
+  (public.apply_mutations(jsonb_build_array(jsonb_build_object(
+    'mutation_id','future-create','device_id','device-a','entity_type','budget',
+    'entity_id','future-budget','operation','upsert','base_revision',1,
+    'payload',jsonb_build_object('id','future-budget','limit',10)
+  ))))->0->>'status',
+  'invalid',
+  'a new record requires base revision zero'
+);
+
+select is(
+  (select count(*) from public.budgets where id = 'future-budget'),
+  0::bigint,
+  'a nonzero new-record revision writes no business row'
+);
+
+select is(
+  (public.apply_mutations(jsonb_build_array(jsonb_build_object(
     'mutation_id','m-3','device_id','device-a','entity_type','transaction',
     'entity_id','tx-1','operation','delete','base_revision',2,'payload',null
   ))))->0->>'status',
@@ -158,6 +190,16 @@ select is(
   ))))->0->>'status',
   'rejected_deleted',
   'an ordinary stale upsert cannot revive a tombstone'
+);
+
+select is(
+  (public.apply_mutations(jsonb_build_array(jsonb_build_object(
+    'mutation_id','m-4','device_id','device-c','entity_type','transaction',
+    'entity_id','tx-1','operation','upsert','base_revision',2,
+    'payload',jsonb_build_object('id','tx-1','amount',99,'externalId','ext-1')
+  ))))->0->'record'->>'amount',
+  '31',
+  'rejected_deleted returns the authoritative current tombstone record'
 );
 
 select is(
@@ -282,9 +324,9 @@ select is(
 
 select is(
   (
-    select item->>'amount'
+    select item->'record'->>'amount'
     from jsonb_array_elements(public.sync_snapshot()->'transactions') item
-    where item->>'id' = 'tx-1'
+    where item->'record'->>'id' = 'tx-1'
   ),
   '77',
   'snapshot cannot expose the other owner''s same-ID record'
@@ -367,14 +409,27 @@ select ok(
 );
 
 select ok(
-  public.sync_snapshot()->'transactions' @> '[{"id":"tx-1","amount":31,"externalId":"ext-1"}]'::jsonb,
+  public.sync_snapshot()->'transactions' @> '[{"record":{"id":"tx-1","amount":31,"externalId":"ext-1"},"revision":4}]'::jsonb,
   'snapshot contains the authenticated user''s live transactions'
 );
 
 select ok(
-  public.sync_snapshot()->'categories' @> '[{"id":"cat-1","name":"Food"}]'::jsonb
-  and public.sync_snapshot()->'budgets' @> '[{"id":"budget-1","limit":500}]'::jsonb,
+  public.sync_snapshot()->'categories' @> '[{"record":{"id":"cat-1","name":"Food"},"revision":1}]'::jsonb
+  and public.sync_snapshot()->'budgets' @> '[{"record":{"id":"budget-1","limit":500},"revision":1}]'::jsonb,
   'snapshot includes mapped category and budget payloads'
+);
+
+select is(
+  (select provolatile::text from pg_proc where oid = 'public.sync_snapshot()'::regprocedure),
+  's',
+  'sync_snapshot is stable so all reads use one query snapshot'
+);
+
+select ok(
+  public.sync_snapshot()->'transactions' @> '[{"record":{"id":"tx-1"},"revision":4}]'::jsonb
+  and public.sync_snapshot()->'categories' @> '[{"record":{"id":"cat-1"},"revision":1}]'::jsonb
+  and public.sync_snapshot()->'budgets' @> '[{"record":{"id":"budget-1"},"revision":1}]'::jsonb,
+  'every snapshot entity includes its authoritative server revision'
 );
 
 select is(
@@ -406,6 +461,11 @@ select ok(
 );
 
 set local role postgres;
+
+update public.applied_mutations
+   set created_at = now() - interval '31 days'
+ where user_id = '11111111-1111-1111-1111-111111111111'
+   and mutation_id = 'm-1';
 
 insert into public.transactions (
   user_id, id, payload, revision, updated_at, deleted_at, last_mutation_id, last_device_id
@@ -449,6 +509,15 @@ select is(
   'cleanup strips expired payloads while retaining the sequence high-water mark'
 );
 
+select ok(
+  (
+    select result->'record' = 'null'::jsonb and result::text not like '%"amount"%'
+    from public.applied_mutations
+    where user_id = '11111111-1111-1111-1111-111111111111' and mutation_id = 'm-1'
+  ),
+  'cleanup strips expired receipt payloads while retaining the idempotency receipt'
+);
+
 set local request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
 set local role authenticated;
 
@@ -472,6 +541,21 @@ set local role postgres;
 
 set local request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
 set local role authenticated;
+
+select ok(
+  (public.apply_mutations(jsonb_build_array(jsonb_build_object(
+    'mutation_id','m-1','device_id','device-a','entity_type','transaction',
+    'entity_id','tx-1','operation','upsert','base_revision',0,
+    'payload',jsonb_build_object('id','tx-1','amount',29,'externalId','ext-1')
+  )))->0->>'status') = 'applied'
+  and (public.apply_mutations(jsonb_build_array(jsonb_build_object(
+    'mutation_id','m-1','device_id','device-a','entity_type','transaction',
+    'entity_id','tx-1','operation','upsert','base_revision',0,
+    'payload',jsonb_build_object('id','tx-1','amount',29,'externalId','ext-1')
+  )))->0->'record') = 'null'::jsonb
+  and (select revision from public.transactions where id = 'tx-1') = 4,
+  'an expired receipt retry remains idempotent without returning retained content'
+);
 
 select is(
   (public.apply_mutations(jsonb_build_array(jsonb_build_object(

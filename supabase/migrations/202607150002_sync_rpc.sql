@@ -131,7 +131,11 @@ begin
       get diagnostics affected_rows = row_count;
       current_found := affected_rows > 0;
 
-      if operation = 'upsert' and (
+      if (current_found and base_revision > current_revision)
+         or (not current_found and base_revision <> 0) then
+        status := 'invalid';
+
+      elsif operation = 'upsert' and (
         (current_found and current_deleted_at is not null)
         or exists (
           select 1
@@ -143,6 +147,7 @@ begin
       ) then
         status := 'rejected_deleted';
         next_revision := current_revision;
+        record := current_payload;
 
       elsif operation = 'upsert' then
         if entity_type = 'transaction'
@@ -349,56 +354,79 @@ $$;
 create or replace function public.sync_snapshot()
 returns jsonb
 language plpgsql
+stable
 security definer
 set search_path = ''
 as $$
 declare
   current_user_id uuid := auth.uid();
-  transaction_rows jsonb;
-  category_rows jsonb;
-  budget_rows jsonb;
-  latest_sequence bigint;
-  min_available_sequence bigint;
+  snapshot jsonb;
 begin
   if current_user_id is null then
     raise exception using errcode = '42501', message = 'authentication required';
   end if;
 
-  select coalesce(jsonb_agg(row.payload order by row.id), '[]'::jsonb)
-    into transaction_rows
-    from public.transactions row
-   where row.user_id = current_user_id and row.deleted_at is null;
+  -- All three entity sets and both cursor bounds are read by one SQL command.
+  -- PostgreSQL therefore supplies one MVCC statement snapshot, so the returned
+  -- high-water mark can never advance past records omitted from this snapshot.
+  with transaction_snapshot as (
+    select coalesce(
+      jsonb_agg(
+        jsonb_build_object('record', row.payload, 'revision', row.revision)
+        order by row.id
+      ),
+      '[]'::jsonb
+    ) as rows
+      from public.transactions row
+     where row.user_id = current_user_id and row.deleted_at is null
+  ), category_snapshot as (
+    select coalesce(
+      jsonb_agg(
+        jsonb_build_object('record', row.payload, 'revision', row.revision)
+        order by row.id
+      ),
+      '[]'::jsonb
+    ) as rows
+      from public.categories row
+     where row.user_id = current_user_id and row.deleted_at is null
+  ), budget_snapshot as (
+    select coalesce(
+      jsonb_agg(
+        jsonb_build_object('record', row.payload, 'revision', row.revision)
+        order by row.id
+      ),
+      '[]'::jsonb
+    ) as rows
+      from public.budgets row
+     where row.user_id = current_user_id and row.deleted_at is null
+  ), sequence_snapshot as (
+    select coalesce(max(log.sequence), 0) as latest_sequence,
+           min(log.sequence) filter (
+             where log.created_at > pg_catalog.now() - interval '30 days'
+           ) as retained_minimum
+      from public.change_log log
+     where log.user_id = current_user_id
+  )
+  select jsonb_build_object(
+    'transactions', transaction_snapshot.rows,
+    'categories', category_snapshot.rows,
+    'budgets', budget_snapshot.rows,
+    'latest_sequence', sequence_snapshot.latest_sequence,
+    'min_available_sequence', coalesce(
+      sequence_snapshot.retained_minimum,
+      case
+        when sequence_snapshot.latest_sequence = 0 then 0
+        else sequence_snapshot.latest_sequence + 1
+      end
+    )
+  )
+    into snapshot
+    from transaction_snapshot
+    cross join category_snapshot
+    cross join budget_snapshot
+    cross join sequence_snapshot;
 
-  select coalesce(jsonb_agg(row.payload order by row.id), '[]'::jsonb)
-    into category_rows
-    from public.categories row
-   where row.user_id = current_user_id and row.deleted_at is null;
-
-  select coalesce(jsonb_agg(row.payload order by row.id), '[]'::jsonb)
-    into budget_rows
-    from public.budgets row
-   where row.user_id = current_user_id and row.deleted_at is null;
-
-  select coalesce(max(log.sequence), 0),
-         min(log.sequence) filter (
-           where log.created_at > pg_catalog.now() - interval '30 days'
-         )
-    into latest_sequence, min_available_sequence
-    from public.change_log log
-   where log.user_id = current_user_id;
-
-  min_available_sequence := coalesce(
-    min_available_sequence,
-    case when latest_sequence = 0 then 0 else latest_sequence + 1 end
-  );
-
-  return jsonb_build_object(
-    'transactions', transaction_rows,
-    'categories', category_rows,
-    'budgets', budget_rows,
-    'latest_sequence', latest_sequence,
-    'min_available_sequence', min_available_sequence
-  );
+  return snapshot;
 end;
 $$;
 
@@ -482,6 +510,11 @@ begin
          after_data = null
    where log.created_at <= pg_catalog.now() - interval '30 days'
      and (log.before_data is not null or log.after_data is not null);
+
+  update public.applied_mutations applied
+     set result = jsonb_set(applied.result, '{record}', 'null'::jsonb, true)
+   where applied.created_at <= pg_catalog.now() - interval '30 days'
+     and applied.result->'record' is distinct from 'null'::jsonb;
 
   return jsonb_build_object(
     'transaction', transaction_count,
