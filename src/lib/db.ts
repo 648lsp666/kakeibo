@@ -1,5 +1,5 @@
 import type { BudgetRule, Category, Transaction } from '../types'
-import { getActiveWorkspace } from '../sync/local-db'
+import { getActiveWorkspace, withWorkspaceWrite } from '../sync/local-db'
 
 export async function getDb() {
   return getActiveWorkspace()
@@ -16,20 +16,19 @@ export const transactionOps = {
   },
 
   async addMany(txs: Transaction[]): Promise<{ added: number; skipped: number }> {
-    const db = await getDb()
-    const dbTx = db.transaction('transactions', 'readwrite')
-    const store = dbTx.objectStore('transactions')
-    let added = 0, skipped = 0
-    for (const tx of txs) {
-      if (tx.externalId) {
-        const existing = await store.index('by-external').get(tx.externalId)
-        if (existing) { skipped++; continue }
+    return withWorkspaceWrite(['transactions'], async dbTx => {
+      const store = dbTx.objectStore('transactions')
+      let added = 0, skipped = 0
+      for (const tx of txs) {
+        if (tx.externalId) {
+          const existing = await store.index('by-external').get(tx.externalId)
+          if (existing) { skipped++; continue }
+        }
+        await store.put(tx)
+        added++
       }
-      await store.put(tx)
-      added++
-    }
-    await dbTx.done
-    return { added, skipped }
+      return { added, skipped }
+    })
   },
 
   async getByMonth(yearMonth: string): Promise<Transaction[]> {

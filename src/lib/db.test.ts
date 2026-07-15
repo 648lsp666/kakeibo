@@ -70,6 +70,18 @@ describe('transactionOps', () => {
     expect(transactionSpy).toHaveBeenCalledTimes(1)
     expect(await db.getAll('transactions')).toHaveLength(2)
   })
+
+  it('rolls back addMany and reports the original request failure without an unhandled abort', async () => {
+    const db = await getDb()
+    const invalid = { ...mockTx(), id: undefined } as unknown as Transaction
+
+    await expect(transactionOps.addMany([
+      { ...mockTx(), id: 'before-failure' },
+      invalid,
+    ])).rejects.toMatchObject({ name: 'DataError' })
+
+    expect(await db.getAll('transactions')).toEqual([])
+  })
 })
 
 describe('categoryOps', () => {

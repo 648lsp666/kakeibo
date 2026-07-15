@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { PendingOperation } from './contracts'
 import {
   getActiveWorkspace,
@@ -154,6 +154,33 @@ describe('workspace database', () => {
     db.close()
   })
 
+  it('rejects a failed legacy budget migration without an unhandled rejection', async () => {
+    const id = { kind: 'user', userId: 'local-db-v1-budget-failure' } as const
+    const invalidBudget = { amount: 2000, period: 'monthly' } as BudgetRule
+    await createVersionOneDatabase(
+      workspaceDbName(id),
+      transaction('legacy-budget-failure-tx'),
+      [invalidBudget],
+    )
+
+    await expect(openWorkspace(id)).rejects.toBeDefined()
+
+    const legacy = await new Promise<{ key: string; value: string } | undefined>((resolve, reject) => {
+      const request = indexedDB.open(workspaceDbName(id), 1)
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => {
+        const db = request.result
+        const get = db.transaction('sync_config').objectStore('sync_config').get('budgets')
+        get.onerror = () => reject(get.error)
+        get.onsuccess = () => {
+          db.close()
+          resolve(get.result)
+        }
+      }
+    })
+    expect(legacy?.key).toBe('budgets')
+  })
+
   it('upgrades v2 to v3 without losing business, config, or sync metadata', async () => {
     const id = { kind: 'user', userId: 'local-db-v2-data' } as const
     const legacy = transaction('v2-transaction')
@@ -228,6 +255,52 @@ describe('workspace database', () => {
     const db = await getActiveWorkspace()
     expect((await db.get('outbox', first.operationId))?.enqueueOrder).toBe(1)
     expect((await db.get('outbox', second.operationId))?.enqueueOrder).toBe(2)
+  })
+
+  it('never lets one outbox put cross into a newly active account', async () => {
+    const oldId = { kind: 'user', userId: 'local-db-put-old' } as const
+    const newId = { kind: 'user', userId: 'local-db-put-new' } as const
+    await switchWorkspace(oldId)
+    const oldDb = await getActiveWorkspace()
+    const originalTransaction = oldDb.transaction.bind(oldDb)
+    const readStarted = deferred<void>()
+    const releaseRead = deferred<void>()
+
+    vi.spyOn(oldDb, 'transaction').mockImplementation(((...args: Parameters<typeof originalTransaction>) => {
+      const tx = originalTransaction(...args)
+      if (Array.from(tx.objectStoreNames).includes('outbox')) {
+        const store = tx.objectStore('outbox')
+        const originalGet = store.get.bind(store)
+        vi.spyOn(store, 'get').mockImplementation(async key => {
+          const result = await originalGet(key)
+          readStarted.resolve()
+          await releaseRead.promise
+          return result
+        })
+      }
+      return tx
+    }) as typeof oldDb.transaction)
+
+    const pending = operation(transaction('workspace-bound-put'))
+    const write = outboxOps.put(pending).then(
+      () => ({ kind: 'resolved' as const }),
+      error => ({ kind: 'rejected' as const, error }),
+    )
+
+    await readStarted.promise
+    await switchWorkspace(newId)
+    releaseRead.resolve()
+    const result = await write
+
+    const newDb = await getActiveWorkspace()
+    expect(await newDb.get('outbox', pending.operationId)).toBeUndefined()
+
+    if (result.kind === 'resolved') {
+      await switchWorkspace(oldId)
+      expect(await outboxOps.get(pending.operationId)).toEqual(pending)
+    } else {
+      expect(result.error).toBeDefined()
+    }
   })
 
   it('exposes a generation snapshot that becomes stale after switching accounts', async () => {

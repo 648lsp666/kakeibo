@@ -85,6 +85,10 @@ function createVersionThreeOutbox(db: IDBPDatabase<KakeiboSchemaV3>): void {
 export async function openWorkspace(id: WorkspaceId): Promise<IDBPDatabase<KakeiboSchemaV3>> {
   return openDB<KakeiboSchemaV3>(workspaceDbName(id), 3, {
     upgrade(db, oldVersion, _newVersion, tx) {
+      void tx.done.then(
+        () => undefined,
+        () => undefined,
+      )
       if (oldVersion < 1) createVersionOneStores(db)
 
       if (oldVersion < 2) {
@@ -93,22 +97,31 @@ export async function openWorkspace(id: WorkspaceId): Promise<IDBPDatabase<Kakei
 
         const config = tx.objectStore('sync_config')
         const budgets = tx.objectStore('budgets')
-        void config.get('budgets').then(async legacy => {
-          if (!legacy) return
-
-          let rules: BudgetRule[]
+        void (async () => {
           try {
-            rules = JSON.parse(legacy.value) as BudgetRule[]
-            if (!Array.isArray(rules)) return
-          } catch {
-            return
-          }
+            const legacy = await config.get('budgets')
+            if (!legacy) return
 
-          for (const rule of rules) {
-            await budgets.put({ ...rule, revision: 0 })
+            let rules: BudgetRule[]
+            try {
+              rules = JSON.parse(legacy.value) as BudgetRule[]
+              if (!Array.isArray(rules)) return
+            } catch {
+              return
+            }
+
+            for (const rule of rules) {
+              await budgets.put({ ...rule, revision: 0 })
+            }
+            await config.delete('budgets')
+          } catch {
+            try {
+              tx.abort()
+            } catch {
+              // A failed IndexedDB request may already have aborted the upgrade.
+            }
           }
-          await config.delete('budgets')
-        })
+        })()
       }
 
       if (oldVersion < 3) {
@@ -264,13 +277,20 @@ function withoutEnqueueOrder(operation: StoredPendingOperation): PendingOperatio
 
 export const outboxOps = {
   async put(operation: PendingOperation): Promise<void> {
-    const db = await getActiveWorkspace()
-    const existing = await db.get('outbox', operation.operationId)
-    if (existing) {
-      await db.put('outbox', { ...operation, enqueueOrder: existing.enqueueOrder })
-      return
-    }
-    await outboxOps.add(operation)
+    await withWorkspaceWrite(['outbox', 'sync_meta'], async tx => {
+      const outbox = tx.objectStore('outbox')
+      const existing = await outbox.get(operation.operationId)
+      if (existing) {
+        await outbox.put({ ...operation, enqueueOrder: existing.enqueueOrder })
+        return
+      }
+
+      const meta = tx.objectStore('sync_meta')
+      const current = await meta.get('outbox_sequence')
+      const enqueueOrder = Number.parseInt(current?.value ?? '0', 10) + 1
+      await outbox.add({ ...operation, enqueueOrder })
+      await meta.put({ key: 'outbox_sequence', value: String(enqueueOrder) })
+    })
   },
 
   async add(operation: PendingOperation): Promise<void> {
