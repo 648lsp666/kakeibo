@@ -25,6 +25,20 @@ export interface CloudRecord {
   deletedAt: string | null
 }
 
+export interface OperationResult extends CloudRecord {
+  operationId: string
+  status: 'applied' | 'deleted' | 'duplicate' | 'deduplicated' | 'rejected_deleted'
+}
+
+export interface SyncTransport {
+  pullAll(): Promise<CloudRecord[]>
+  push(operation: PendingOperation): Promise<OperationResult>
+  subscribe(
+    onWake: () => void,
+    onConnection: (online: boolean) => void,
+  ): Promise<() => Promise<void>>
+}
+
 export type SyncStatus =
   | { kind: 'local-only' }
   | { kind: 'idle'; lastSyncedAt?: string }

@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid'
 import type { BudgetRule, Category, Transaction } from '../types'
-import type { CloudRecord, EntityType, PendingOperation, SyncPayload } from './contracts'
+import type { CloudRecord, EntityType, OperationResult, PendingOperation, SyncPayload } from './contracts'
 import { getWorkspaceSnapshot, withWorkspaceWrite } from './local-db'
 import { emitSyncWake } from './wake-bus'
 
@@ -16,6 +16,7 @@ export interface DomainRepository {
   removeAllTransactions(): Promise<void>
   importTransactions(records: Transaction[]): Promise<{ added: number; skipped: number }>
   applyCloudRecords(records: CloudRecord[]): Promise<void>
+  acknowledgeOperation(operationId: string, result: OperationResult): Promise<void>
   exportSnapshot(): Promise<DomainSnapshot>
 }
 
@@ -233,6 +234,60 @@ export function createDomainRepository(options: DomainRepositoryOptions = {}): D
       }
 
       await tx.done
+    },
+
+    async acknowledgeOperation(operationId, result) {
+      const { db } = await getWorkspaceSnapshot()
+      const store = storeName(result.entityType)
+      const tx = db.transaction([store, 'outbox'], 'readwrite')
+      const completion = tx.done.then(
+        () => ({ ok: true as const }),
+        error => ({ ok: false as const, error }),
+      )
+
+      try {
+        const outbox = tx.objectStore('outbox')
+        const confirmed = await outbox.get(operationId)
+        if (!confirmed) throw new Error(`Pending operation ${operationId} no longer exists`)
+        if (confirmed.entityType !== result.entityType) throw new Error('Acknowledgement entity type mismatch')
+        const business = tx.objectStore(store)
+        if (result.entityType === 'category') {
+          if (result.record && (result.record as Category).isSystem) throw new Error('Cloud result cannot replace a system category')
+          if (result.deletedAt || !result.record) {
+            const existing = await tx.objectStore('categories').get(result.entityId)
+            if (!existing?.isSystem) await business.delete(result.entityId)
+          } else {
+            await business.put(result.record as never)
+          }
+        } else if (result.deletedAt || !result.record) {
+          await business.delete(result.entityId)
+        } else {
+          await business.put(storedPayload(result.entityType, result.record) as never)
+        }
+
+        await outbox.delete(operationId)
+        const later = (await outbox.index('by-entity').getAll([confirmed.entityType, confirmed.entityId]))
+          .filter(operation => operation.state === 'pending')
+          .sort((left, right) => left.enqueueOrder - right.enqueueOrder)
+        for (const operation of later) {
+          if (operation.operation === 'delete' || !operation.payload) {
+            await business.delete(operation.entityId)
+          } else {
+            await business.put(storedPayload(operation.entityType, operation.payload) as never)
+          }
+        }
+
+        const completed = await completion
+        if (!completed.ok) throw completed.error
+      } catch (error) {
+        try {
+          tx.abort()
+        } catch {
+          // A failed IndexedDB request may already have aborted the transaction.
+        }
+        await completion
+        throw error
+      }
     },
 
     async exportSnapshot() {

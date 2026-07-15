@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { BudgetRule, Category, Transaction } from '../types'
-import type { CloudRecord, PendingOperation } from './contracts'
+import type { CloudRecord, OperationResult, PendingOperation } from './contracts'
 import { createDomainRepository, domainRepository } from './domain-repository'
 import { getActiveWorkspace, outboxOps, switchWorkspace } from './local-db'
 import { subscribeSyncWake } from './wake-bus'
@@ -224,6 +224,69 @@ describe('domain repository local writes', () => {
 })
 
 describe('domain repository cloud application', () => {
+  it('acknowledges one exact operation and re-overlays later pending intent atomically', async () => {
+    const confirmed = transaction('acknowledged', 'server confirmed')
+    const later = transaction('acknowledged', 'later local intent')
+    const other = transaction('other-entity', 'untouched')
+    await outboxOps.add(pending('confirmed-operation', transaction('acknowledged', 'first local intent')))
+    await outboxOps.add(pending('later-operation', later))
+    await outboxOps.add(pending('other-operation', other))
+    const result: OperationResult = {
+      ...cloud(confirmed),
+      operationId: 'confirmed-operation',
+      status: 'applied',
+    }
+
+    await domainRepository.acknowledgeOperation('confirmed-operation', result)
+
+    const db = await getActiveWorkspace()
+    expect(await db.get('transactions', confirmed.id)).toEqual(later)
+    expect((await outboxOps.list()).map(item => item.operationId)).toEqual(['later-operation', 'other-operation'])
+  })
+
+  it('re-overlays the confirmed operation entity when deduplication returns a different canonical ID', async () => {
+    const duplicateLocal = transaction('duplicate-local', 'first duplicate intent')
+    const laterLocal = transaction('duplicate-local', 'later duplicate intent')
+    const canonical = transaction('canonical-server', 'canonical server row')
+    await outboxOps.add(pending('deduplicated-operation', duplicateLocal))
+    await outboxOps.add(pending('later-duplicate-operation', laterLocal))
+    const result: OperationResult = {
+      ...cloud(canonical),
+      operationId: 'deduplicated-operation',
+      status: 'deduplicated',
+    }
+
+    await domainRepository.acknowledgeOperation('deduplicated-operation', result)
+
+    const db = await getActiveWorkspace()
+    expect(await db.get('transactions', canonical.id)).toEqual(canonical)
+    expect(await db.get('transactions', duplicateLocal.id)).toEqual(laterLocal)
+    expect((await outboxOps.list()).map(item => item.operationId)).toEqual(['later-duplicate-operation'])
+  })
+
+  it('rolls back both server application and exact outbox deletion when acknowledgement fails', async () => {
+    const before = transaction('ack-rollback', 'before acknowledgement')
+    const server = transaction('ack-rollback', 'server result')
+    const db = await getActiveWorkspace()
+    await db.put('transactions', before)
+    await outboxOps.add(pending('rollback-confirmed', before))
+    await db.put('outbox', {
+      ...pending('rollback-later', transaction('ack-rollback', 'invalid overlay')),
+      payload: {} as Transaction,
+      enqueueOrder: 2,
+    })
+    const result: OperationResult = {
+      ...cloud(server),
+      operationId: 'rollback-confirmed',
+      status: 'applied',
+    }
+
+    await expect(domainRepository.acknowledgeOperation('rollback-confirmed', result)).rejects.toThrow()
+
+    expect(await db.get('transactions', before.id)).toEqual(before)
+    expect((await outboxOps.list()).map(item => item.operationId)).toEqual(['rollback-confirmed', 'rollback-later'])
+  })
+
   it('applies cloud rows and tombstones without creating outbox work or wakes', async () => {
     const removed = transaction('deleted-cloud')
     const received = transaction('received-cloud', 'cloud')
