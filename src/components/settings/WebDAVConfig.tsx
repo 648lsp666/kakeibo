@@ -115,7 +115,7 @@ export function WebDAVConfig() {
         <div>
           <h3 style={{ color: 'var(--color-text)', fontSize: 14, fontWeight: 800 }}>手动灾备</h3>
           <p style={{ color: 'var(--color-text-small)', fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
-            WebDAV 仅用于手动备份与恢复，不参与自动同步。
+            WebDAV 仅用于手动备份与恢复，不参与自动同步。下载恢复前请先退出账号并在本机模式恢复，恢复内容不会合并到云端。
           </p>
         </div>
       </div>

@@ -3,6 +3,7 @@ import type { PendingOperation } from './contracts'
 import {
   getActiveWorkspace,
   getWorkspaceSnapshot,
+  importAnonymousWebDavTransactions,
   isWorkspaceCurrent,
   openWorkspace,
   outboxOps,
@@ -113,6 +114,22 @@ async function createVersionTwoDatabase(name: string, tx: Transaction): Promise<
 }
 
 describe('workspace database', () => {
+  it('imports a WebDAV recovery into the anonymous ledger without changing its outbox', async () => {
+    await switchWorkspace({ kind: 'anonymous' })
+    const existing = transaction('existing')
+    const restored = { ...transaction('restored'), updatedAt: '2026-07-16T00:00:00.000Z' }
+    await withWorkspaceWrite(['transactions', 'outbox'], async tx => {
+      await tx.objectStore('transactions').put(existing)
+      await tx.objectStore('outbox').add({ ...operation(existing), enqueueOrder: 1 })
+    })
+
+    await expect(importAnonymousWebDavTransactions([restored])).resolves.toEqual({ added: 1, updated: 0 })
+
+    const db = await getActiveWorkspace()
+    expect(await db.get('transactions', restored.id)).toEqual(restored)
+    expect(await outboxOps.list()).toEqual([operation(existing)])
+  })
+
   it('maps anonymous and distinct users to distinct database names', async () => {
     const anonymous = await openWorkspace({ kind: 'anonymous' })
     const userA = await openWorkspace({ kind: 'user', userId: 'local-db-name-a' })

@@ -279,6 +279,39 @@ export async function withWorkspaceSnapshotWrite<T, Stores extends Array<Workspa
   }
 }
 
+/**
+ * Restores a manual WebDAV backup into the anonymous, local-only ledger.
+ * This deliberately bypasses the domain repository: recovery must never
+ * enqueue cloud operations or wake automatic sync.
+ */
+export async function importAnonymousWebDavTransactions(
+  records: Transaction[],
+): Promise<{ added: number; updated: number }> {
+  const workspace = await getWorkspaceSnapshot()
+  if (workspace.id.kind !== 'anonymous') {
+    throw new Error('请先退出账号并在本机模式恢复 WebDAV 备份')
+  }
+
+  return withWorkspaceSnapshotWrite(workspace, ['transactions'], async tx => {
+    const transactions = tx.objectStore('transactions')
+    let added = 0
+    let updated = 0
+
+    for (const record of records) {
+      const existing = await transactions.get(record.id)
+      if (!existing) {
+        await transactions.put(record)
+        added++
+      } else if (record.updatedAt > existing.updatedAt) {
+        await transactions.put(record)
+        updated++
+      }
+    }
+
+    return { added, updated }
+  })
+}
+
 function withoutEnqueueOrder(operation: StoredPendingOperation): PendingOperation {
   const { enqueueOrder: _enqueueOrder, ...pending } = operation
   return pending

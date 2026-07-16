@@ -4,7 +4,7 @@
 
 Synchronization runs while the web app/PWA is open or foregrounded. Startup, returning to the foreground, network recovery, and Realtime notifications trigger catch-up; a closed app has no background sync worker. Sign in using the Supabase email magic-link/OTP flow. The browser receives only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`; never expose a service-role key, database password, or WebDAV credential.
 
-WebDAV and JSON export are manual disaster-recovery backups only. They do not authenticate a cloud account or merge with automatic Supabase sync.
+WebDAV and JSON export are manual disaster-recovery backups only. They do not authenticate a cloud account or merge with automatic Supabase sync. To restore a WebDAV backup, first sign out so the app is in its anonymous local workspace, then use **下载恢复**. Signed-in workspaces reject recovery; the local restore bypasses the outbox and is never uploaded or merged into Supabase automatically.
 
 ## Local Supabase and OTP
 
@@ -43,4 +43,4 @@ Use two independent browser profiles or physical devices, signed into the same e
 4. Delete a transaction on A, then let B attempt an older offline edit. Both devices must retain the deletion.
 5. Refresh/reopen either device and confirm it catches up. Sign out and sign in as a different account; no prior account rows may appear.
 
-If cloud sync is unavailable, continue using the local ledger and export JSON or use WebDAV manually for disaster recovery. Do not treat either backup as an automatic-sync substitute.
+If cloud sync is unavailable, continue using the local ledger and export JSON or use WebDAV manually for disaster recovery. Do not treat either backup as an automatic-sync substitute. For a WebDAV restore, sign out first and restore only in local mode; do not use it to overwrite or combine a signed-in cloud ledger.

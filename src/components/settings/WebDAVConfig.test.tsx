@@ -42,6 +42,7 @@ describe('WebDAVConfig', () => {
 
     expect(screen.getByRole('heading', { name: '手动灾备' })).toBeInTheDocument()
     expect(screen.getByText(/不参与自动同步/)).toBeInTheDocument()
+    expect(screen.getByText(/请先退出账号并在本机模式恢复/)).toBeInTheDocument()
     await waitFor(() => expect(mocks.getAll).toHaveBeenCalledOnce())
   })
 
