@@ -112,7 +112,12 @@ export function WebDAVConfig() {
     <div>
       <div style={{ alignItems: 'center', color: 'var(--color-primary-strong)', display: 'flex', gap: 8, marginBottom: 14 }}>
         <Icon name="cloud" size={20} />
-        <h3 style={{ color: 'var(--color-text)', fontSize: 14, fontWeight: 800 }}>WebDAV 云同步</h3>
+        <div>
+          <h3 style={{ color: 'var(--color-text)', fontSize: 14, fontWeight: 800 }}>手动灾备</h3>
+          <p style={{ color: 'var(--color-text-small)', fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
+            WebDAV 仅用于手动备份与恢复，不参与自动同步。
+          </p>
+        </div>
       </div>
       <div style={{ display: 'grid', gap: 10 }}>
         <label htmlFor="webdav-url" style={fieldLabel}>服务器地址</label>

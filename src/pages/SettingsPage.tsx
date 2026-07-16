@@ -8,7 +8,7 @@ export function SettingsPage() {
       <header style={{ marginBottom: 20 }}>
         <h1 style={{ color: 'var(--color-text)', fontSize: 24, fontWeight: 900 }}>设置</h1>
         <p style={{ color: 'var(--color-text-small)', fontSize: 13, lineHeight: 1.6, marginTop: 6 }}>
-          管理同步备份和本地数据。
+          管理自动同步、手动灾备和本地数据。
         </p>
       </header>
       <section aria-labelledby="sync-settings-title">

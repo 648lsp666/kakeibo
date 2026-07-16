@@ -8,6 +8,7 @@ import { AddSheet } from './components/entry/AddSheet'
 import './index.css'
 import { AuthSyncProvider, useAuthSync } from './sync/auth-session'
 import { CloudSyncCard } from './components/settings/CloudSyncCard'
+import { SyncStatusPill } from './components/sync/SyncStatusPill'
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ function AppContent() {
 
   return (
     <div className="app-shell" style={shellStyle}>
+      <SyncStatusPill />
       <main style={{ flex: 1, minHeight: 0, overflow: 'hidden', paddingBottom: 'calc(90px + env(safe-area-inset-bottom))' }}>
         {activeTab === 'ledger'   && <LedgerPage />}
         {activeTab === 'stats'    && <StatsPage />}
