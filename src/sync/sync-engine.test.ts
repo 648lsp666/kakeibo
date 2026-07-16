@@ -84,6 +84,20 @@ describe('foreground sync engine', () => {
     await engine.stop()
   })
 
+  it('passes its bound workspace snapshot to cloud application and acknowledgements', async () => {
+    const operation = pending('bound-workspace')
+    await outboxOps.add(operation)
+    const repo = repository()
+    const workspace = await getWorkspaceSnapshot()
+    const engine = createSyncEngine({ userId: 'user-1', workspace, transport: transport(), repository: repo, now: () => now })
+
+    await engine.start()
+
+    expect(repo.applyCloudRecords).toHaveBeenCalledWith([], workspace)
+    expect(repo.acknowledgeOperation).toHaveBeenCalledWith(operation.operationId, result(operation), workspace)
+    await engine.stop()
+  })
+
   it('stays offline without touching pending operations', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
     await outboxOps.add(pending('offline-op'))

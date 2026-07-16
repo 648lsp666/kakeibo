@@ -151,7 +151,7 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
     }
     if (!ownsLifecycle(generation)) return false
     pullRetryCount = 0
-    await input.repository.applyCloudRecords(records)
+    await input.repository.applyCloudRecords(records, input.workspace)
     return ownsLifecycle(generation)
   }
 
@@ -189,7 +189,7 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
         return
       }
       if (!ownsLifecycle(generation)) return
-      await input.repository.acknowledgeOperation(operation.operationId, result)
+      await input.repository.acknowledgeOperation(operation.operationId, result, input.workspace)
       if (!ownsLifecycle(generation)) return
       pushed = true
     }

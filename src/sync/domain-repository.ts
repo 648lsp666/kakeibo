@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid'
 import type { BudgetRule, Category, Transaction } from '../types'
 import type { CloudRecord, EntityType, OperationResult, PendingOperation, SyncPayload } from './contracts'
-import { getWorkspaceSnapshot, withWorkspaceWrite } from './local-db'
+import { getWorkspaceSnapshot, withWorkspaceSnapshotWrite, withWorkspaceWrite, type WorkspaceSnapshot } from './local-db'
 import { emitSyncWake } from './wake-bus'
 
 export interface DomainSnapshot {
@@ -15,8 +15,8 @@ export interface DomainRepository {
   remove(entityType: EntityType, entityId: string): Promise<void>
   removeAllTransactions(): Promise<void>
   importTransactions(records: Transaction[]): Promise<{ added: number; skipped: number }>
-  applyCloudRecords(records: CloudRecord[]): Promise<void>
-  acknowledgeOperation(operationId: string, result: OperationResult): Promise<void>
+  applyCloudRecords(records: CloudRecord[], workspace: WorkspaceSnapshot): Promise<void>
+  acknowledgeOperation(operationId: string, result: OperationResult, workspace: WorkspaceSnapshot): Promise<void>
   exportSnapshot(): Promise<DomainSnapshot>
 }
 
@@ -202,50 +202,40 @@ export function createDomainRepository(options: DomainRepositoryOptions = {}): D
       return result
     },
 
-    async applyCloudRecords(records) {
-      const { db } = await getWorkspaceSnapshot()
-      const tx = db.transaction(['transactions', 'categories', 'budgets', 'outbox'], 'readwrite')
-
-      for (const cloudRecord of records) {
-        const store = tx.objectStore(storeName(cloudRecord.entityType))
-        if (cloudRecord.entityType === 'category') {
-          if (cloudRecord.record && (cloudRecord.record as Category).isSystem) continue
+    async applyCloudRecords(records, workspace) {
+      await withWorkspaceSnapshotWrite(workspace, ['transactions', 'categories', 'budgets', 'outbox'], async tx => {
+        for (const cloudRecord of records) {
+          const store = tx.objectStore(storeName(cloudRecord.entityType))
+          if (cloudRecord.entityType === 'category') {
+            if (cloudRecord.record && (cloudRecord.record as Category).isSystem) continue
+            if (cloudRecord.deletedAt || !cloudRecord.record) {
+              const existing = await tx.objectStore('categories').get(cloudRecord.entityId)
+              if (existing?.isSystem) continue
+            }
+          }
           if (cloudRecord.deletedAt || !cloudRecord.record) {
-            const existing = await tx.objectStore('categories').get(cloudRecord.entityId)
-            if (existing?.isSystem) continue
+            await store.delete(cloudRecord.entityId)
+          } else {
+            await store.put(storedPayload(cloudRecord.entityType, cloudRecord.record) as never)
           }
         }
-        if (cloudRecord.deletedAt || !cloudRecord.record) {
-          await store.delete(cloudRecord.entityId)
-        } else {
-          await store.put(storedPayload(cloudRecord.entityType, cloudRecord.record) as never)
-        }
-      }
 
-      const operations = await tx.objectStore('outbox').index('by-order').getAll()
-      for (const operation of operations) {
-        if (operation.state !== 'pending') continue
-        const store = tx.objectStore(storeName(operation.entityType))
-        if (operation.operation === 'delete' || !operation.payload) {
-          await store.delete(operation.entityId)
-        } else {
-          await store.put(storedPayload(operation.entityType, operation.payload) as never)
+        const operations = await tx.objectStore('outbox').index('by-order').getAll()
+        for (const operation of operations) {
+          if (operation.state !== 'pending') continue
+          const store = tx.objectStore(storeName(operation.entityType))
+          if (operation.operation === 'delete' || !operation.payload) {
+            await store.delete(operation.entityId)
+          } else {
+            await store.put(storedPayload(operation.entityType, operation.payload) as never)
+          }
         }
-      }
-
-      await tx.done
+      })
     },
 
-    async acknowledgeOperation(operationId, result) {
-      const { db } = await getWorkspaceSnapshot()
+    async acknowledgeOperation(operationId, result, workspace) {
       const store = storeName(result.entityType)
-      const tx = db.transaction([store, 'outbox'], 'readwrite')
-      const completion = tx.done.then(
-        () => ({ ok: true as const }),
-        error => ({ ok: false as const, error }),
-      )
-
-      try {
+      await withWorkspaceSnapshotWrite(workspace, [store, 'outbox'], async tx => {
         const outbox = tx.objectStore('outbox')
         const confirmed = await outbox.get(operationId)
         if (!confirmed) throw new Error(`Pending operation ${operationId} no longer exists`)
@@ -278,17 +268,7 @@ export function createDomainRepository(options: DomainRepositoryOptions = {}): D
           }
         }
 
-        const completed = await completion
-        if (!completed.ok) throw completed.error
-      } catch (error) {
-        try {
-          tx.abort()
-        } catch {
-          // A failed IndexedDB request may already have aborted the transaction.
-        }
-        await completion
-        throw error
-      }
+      })
     },
 
     async exportSnapshot() {

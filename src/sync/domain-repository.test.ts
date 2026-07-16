@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { BudgetRule, Category, Transaction } from '../types'
 import type { CloudRecord, OperationResult, PendingOperation } from './contracts'
 import { createDomainRepository, domainRepository } from './domain-repository'
-import { getActiveWorkspace, outboxOps, switchWorkspace } from './local-db'
+import { getActiveWorkspace, getWorkspaceSnapshot, outboxOps, switchWorkspace } from './local-db'
 import { subscribeSyncWake } from './wake-bus'
 
 let workspace = 0
@@ -224,6 +224,39 @@ describe('domain repository local writes', () => {
 })
 
 describe('domain repository cloud application', () => {
+  it('rejects cloud application after its workspace snapshot is no longer current', async () => {
+    const accountA = { kind: 'user', userId: `cloud-apply-a-${workspace++}` } as const
+    const accountB = { kind: 'user', userId: `cloud-apply-b-${workspace++}` } as const
+    await switchWorkspace(accountA)
+    const snapshotA = await getWorkspaceSnapshot()
+    await switchWorkspace(accountB)
+
+    await expect(domainRepository.applyCloudRecords([cloud(transaction('from-account-a'))], snapshotA)).rejects.toThrow('no longer active')
+
+    const dbB = await getActiveWorkspace()
+    expect(await dbB.getAll('transactions')).toEqual([])
+    expect(await dbB.getAll('outbox')).toEqual([])
+    expect(await dbB.getAll('sync_meta')).toEqual([])
+  })
+
+  it('rejects cloud acknowledgements after its workspace snapshot is no longer current', async () => {
+    const accountA = { kind: 'user', userId: `cloud-ack-a-${workspace++}` } as const
+    const accountB = { kind: 'user', userId: `cloud-ack-b-${workspace++}` } as const
+    await switchWorkspace(accountA)
+    const snapshotA = await getWorkspaceSnapshot()
+    const operation = pending('account-a-operation', transaction('account-a-row'))
+    await outboxOps.add(operation)
+    await switchWorkspace(accountB)
+    const result: OperationResult = { ...cloud(operation.payload as Transaction), operationId: operation.operationId, status: 'applied' }
+
+    await expect(domainRepository.acknowledgeOperation(operation.operationId, result, snapshotA)).rejects.toThrow('no longer active')
+
+    const dbB = await getActiveWorkspace()
+    expect(await dbB.getAll('transactions')).toEqual([])
+    expect(await dbB.getAll('outbox')).toEqual([])
+    expect(await dbB.getAll('sync_meta')).toEqual([])
+  })
+
   it('acknowledges one exact operation and re-overlays later pending intent atomically', async () => {
     const confirmed = transaction('acknowledged', 'server confirmed')
     const later = transaction('acknowledged', 'later local intent')
@@ -237,7 +270,7 @@ describe('domain repository cloud application', () => {
       status: 'applied',
     }
 
-    await domainRepository.acknowledgeOperation('confirmed-operation', result)
+    await domainRepository.acknowledgeOperation('confirmed-operation', result, await getWorkspaceSnapshot())
 
     const db = await getActiveWorkspace()
     expect(await db.get('transactions', confirmed.id)).toEqual(later)
@@ -256,7 +289,7 @@ describe('domain repository cloud application', () => {
       status: 'deduplicated',
     }
 
-    await domainRepository.acknowledgeOperation('deduplicated-operation', result)
+    await domainRepository.acknowledgeOperation('deduplicated-operation', result, await getWorkspaceSnapshot())
 
     const db = await getActiveWorkspace()
     expect(await db.get('transactions', canonical.id)).toEqual(canonical)
@@ -276,7 +309,7 @@ describe('domain repository cloud application', () => {
       status: 'deduplicated',
     }
 
-    await domainRepository.acknowledgeOperation('deduplicated-without-later', result)
+    await domainRepository.acknowledgeOperation('deduplicated-without-later', result, await getWorkspaceSnapshot())
 
     expect(await db.get('transactions', canonical.id)).toEqual(canonical)
     expect(await db.get('transactions', duplicateLocal.id)).toBeUndefined()
@@ -300,7 +333,7 @@ describe('domain repository cloud application', () => {
       status: 'applied',
     }
 
-    await expect(domainRepository.acknowledgeOperation('rollback-confirmed', result)).rejects.toThrow()
+    await expect(domainRepository.acknowledgeOperation('rollback-confirmed', result, await getWorkspaceSnapshot())).rejects.toThrow()
 
     expect(await db.get('transactions', before.id)).toEqual(before)
     expect((await outboxOps.list()).map(item => item.operationId)).toEqual(['rollback-confirmed', 'rollback-later'])
@@ -314,7 +347,7 @@ describe('domain repository cloud application', () => {
     const wakes: string[] = []
     const unsubscribe = subscribeSyncWake(reason => wakes.push(reason))
 
-    await domainRepository.applyCloudRecords([cloud(null), cloud(received)])
+    await domainRepository.applyCloudRecords([cloud(null), cloud(received)], await getWorkspaceSnapshot())
 
     expect(await db.get('transactions', removed.id)).toBeUndefined()
     expect(await db.get('transactions', received.id)).toEqual(received)
@@ -328,7 +361,7 @@ describe('domain repository cloud application', () => {
     const remote = transaction('overlay', 'cloud baseline')
     await outboxOps.add(pending('pending-overlay', local))
 
-    await domainRepository.applyCloudRecords([cloud(remote)])
+    await domainRepository.applyCloudRecords([cloud(remote)], await getWorkspaceSnapshot())
 
     const db = await getActiveWorkspace()
     expect(await db.get('transactions', local.id)).toEqual(local)
@@ -340,7 +373,7 @@ describe('domain repository cloud application', () => {
     const remote = transaction('isolated', 'cloud wins')
     await outboxOps.add(pending('isolated-operation', isolated, 'isolated'))
 
-    await domainRepository.applyCloudRecords([cloud(remote)])
+    await domainRepository.applyCloudRecords([cloud(remote)], await getWorkspaceSnapshot())
 
     const db = await getActiveWorkspace()
     expect(await db.get('transactions', remote.id)).toEqual(remote)
@@ -355,7 +388,7 @@ describe('domain repository cloud application', () => {
       record: system,
       updatedAt: '2026-07-15T01:00:00.000Z',
       deletedAt: null,
-    }])
+    }], await getWorkspaceSnapshot())
 
     const db = await getActiveWorkspace()
     expect(await db.get('categories', system.id)).toBeUndefined()
@@ -373,7 +406,7 @@ describe('domain repository cloud application', () => {
       record: null,
       updatedAt: '2026-07-15T01:00:00.000Z',
       deletedAt: '2026-07-15T01:00:00.000Z',
-    }])
+    }], await getWorkspaceSnapshot())
 
     expect(await db.get('categories', system.id)).toEqual(system)
     expect(await outboxOps.list()).toEqual([])

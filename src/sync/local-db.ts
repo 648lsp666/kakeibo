@@ -247,8 +247,17 @@ export async function withWorkspaceWrite<T, Stores extends Array<WorkspaceStore>
   stores: Stores,
   run: (tx: IDBPTransaction<KakeiboSchemaV3, Stores, 'readwrite'>) => Promise<T>,
 ): Promise<T> {
-  const db = await getActiveWorkspace()
-  const tx = db.transaction(stores, 'readwrite')
+  return withWorkspaceSnapshotWrite(await getWorkspaceSnapshot(), stores, run)
+}
+
+export async function withWorkspaceSnapshotWrite<T, Stores extends Array<WorkspaceStore>>(
+  snapshot: WorkspaceSnapshot,
+  stores: Stores,
+  run: (tx: IDBPTransaction<KakeiboSchemaV3, Stores, 'readwrite'>) => Promise<T>,
+): Promise<T> {
+  if (!isWorkspaceCurrent(snapshot)) throw new Error('Workspace snapshot is no longer active')
+
+  const tx = snapshot.db.transaction(stores, 'readwrite')
   const completion = tx.done.then(
     () => ({ ok: true as const }),
     error => ({ ok: false as const, error }),
