@@ -2,14 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { createSimpleSyncHarness } from '../test/simple-sync-harness'
 
 describe('simple two-device synchronization', () => {
-  it('converges an offline device A and an online device B after A reconnects', async () => {
+  it('keeps an offline write local until transport recovery wakes device A and both devices converge', async () => {
     const harness = createSimpleSyncHarness()
     const a = await harness.device('a')
     const b = await harness.device('b')
 
-    await a.offlineAddTransaction('a-offline')
+    await a.goOffline()
+    await a.addTransaction('a-offline')
+    await a.sync()
+    expect(harness.serverWriteCount('a-offline')).toBe(0)
+    await expect(a.pendingOperationCount()).resolves.toBe(1)
+
     await b.addTransaction('b-online')
     await b.sync()
+    await a.goOnline()
     await a.sync()
     await b.sync()
 

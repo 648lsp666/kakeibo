@@ -1,8 +1,6 @@
+import { vi } from 'vitest'
 import type { Category, Transaction } from '../types'
 import type { CloudRecord, OperationResult, SyncTransport } from '../sync/contracts'
-import { createDomainRepository } from '../sync/domain-repository'
-import { getWorkspaceSnapshot, switchWorkspace } from '../sync/local-db'
-import { createSyncEngine } from '../sync/sync-engine'
 
 type ServerRow = CloudRecord & { operationIds: Set<string> }
 
@@ -11,7 +9,8 @@ interface SyncOptions {
 }
 
 interface SimpleDevice {
-  offlineAddTransaction(id: string): Promise<void>
+  goOffline(): Promise<void>
+  goOnline(): Promise<void>
   addTransaction(id: string): Promise<void>
   updateTransaction(id: string, note: string): Promise<void>
   deleteTransaction(id: string): Promise<void>
@@ -20,6 +19,7 @@ interface SimpleDevice {
   switchUser(userId: string): Promise<void>
   transactionIds(): Promise<string[]>
   categoryName(id: string): Promise<string | undefined>
+  pendingOperationCount(): Promise<number>
 }
 
 let harnessNumber = 0
@@ -42,56 +42,74 @@ export function createSimpleSyncHarness(): {
   const key = (userId: string, entityType: CloudRecord['entityType'], entityId: string) => `${userId}:${entityType}:${entityId}`
   const clone = (row: CloudRecord): CloudRecord => ({ ...row, record: row.record ? structuredClone(row.record) : null })
 
-  const makeTransport = (userId: string, options: SyncOptions = {}): SyncTransport => ({
-    async pullAll() {
-      if (options.delayPull) {
-        await new Promise<void>(resolve => {
-          delayedPull = resolve
-          delayedPullStarted?.()
-          delayedPullStarted = null
-        })
-      }
-      return [...rows.entries()]
-        .filter(([rowKey]) => rowKey.startsWith(`${userId}:`))
-        .map(([, row]) => clone(row))
-    },
-    async push(operation) {
-      const rowKey = key(userId, operation.entityType, operation.entityId)
-      const existing = rows.get(rowKey)
-      let result: OperationResult
-      if (existing?.operationIds.has(operation.operationId)) {
-        result = { ...clone(existing), operationId: operation.operationId, status: 'duplicate' }
-      } else if (operation.operation === 'upsert' && existing?.deletedAt) {
-        existing.operationIds.add(operation.operationId)
-        result = { ...clone(existing), operationId: operation.operationId, status: 'rejected_deleted' }
-      } else {
-        const record: CloudRecord = {
-          entityType: operation.entityType,
-          entityId: operation.entityId,
-          record: operation.operation === 'delete' ? null : structuredClone(operation.payload),
-          updatedAt: timestamp,
-          deletedAt: operation.operation === 'delete' ? timestamp : null,
-        }
-        rows.set(rowKey, { ...record, operationIds: new Set([operation.operationId]) })
-        writeCounts.set(operation.entityId, (writeCounts.get(operation.entityId) ?? 0) + 1)
-        result = { ...record, operationId: operation.operationId, status: operation.operation === 'delete' ? 'deleted' : 'applied' }
-      }
-      if (loseResponse) {
-        loseResponse = false
-        throw new Error('response lost after server acceptance')
-      }
-      return result
-    },
-    async subscribe() {
-      return async () => undefined
-    },
-  })
-
   const device = async (name: string, initialUser = 'user-one'): Promise<SimpleDevice> => {
+    // Each device gets its own actual local-db/domain-repository/sync-engine module graph.
+    // Resetting before dynamic imports prevents the local-db active-workspace singleton
+    // from being shared by the two simulated devices.
+    vi.resetModules()
+    const localDb = await import('../sync/local-db')
+    const { createDomainRepository } = await import('../sync/domain-repository')
+    const { createSyncEngine } = await import('../sync/sync-engine')
+
     let userId = initialUser
+    let online = true
+    let delayNextPull = false
+    let onConnection: ((online: boolean) => void) | null = null
     const workspaceUser = () => `${namespace}-${name}-${userId}`
-    const activate = () => switchWorkspace({ kind: 'user', userId: workspaceUser() })
-    await activate()
+    await localDb.switchWorkspace({ kind: 'user', userId: workspaceUser() })
+
+    const makeTransport = (): SyncTransport => ({
+      async pullAll() {
+        if (!online) throw new Error('transport unavailable while offline')
+        if (delayNextPull) {
+          delayNextPull = false
+          await new Promise<void>(resolve => {
+            delayedPull = resolve
+            delayedPullStarted?.()
+            delayedPullStarted = null
+          })
+        }
+        return [...rows.entries()]
+          .filter(([rowKey]) => rowKey.startsWith(`${userId}:`))
+          .map(([, row]) => clone(row))
+      },
+      async push(operation) {
+        if (!online) throw new Error('transport unavailable while offline')
+        const rowKey = key(userId, operation.entityType, operation.entityId)
+        const existing = rows.get(rowKey)
+        let result: OperationResult
+        if (existing?.operationIds.has(operation.operationId)) {
+          result = { ...clone(existing), operationId: operation.operationId, status: 'duplicate' }
+        } else if (operation.operation === 'upsert' && existing?.deletedAt) {
+          existing.operationIds.add(operation.operationId)
+          result = { ...clone(existing), operationId: operation.operationId, status: 'rejected_deleted' }
+        } else {
+          const record: CloudRecord = {
+            entityType: operation.entityType,
+            entityId: operation.entityId,
+            record: operation.operation === 'delete' ? null : structuredClone(operation.payload),
+            updatedAt: timestamp,
+            deletedAt: operation.operation === 'delete' ? timestamp : null,
+          }
+          rows.set(rowKey, { ...record, operationIds: new Set([operation.operationId]) })
+          writeCounts.set(operation.entityId, (writeCounts.get(operation.entityId) ?? 0) + 1)
+          result = {
+            ...record,
+            operationId: operation.operationId,
+            status: operation.operation === 'delete' ? 'deleted' : 'applied',
+          }
+        }
+        if (loseResponse) {
+          loseResponse = false
+          throw new Error('response lost after server acceptance')
+        }
+        return result
+      },
+      async subscribe(_onWake, connection) {
+        onConnection = connection
+        return async () => undefined
+      },
+    })
     const repository = createDomainRepository({ operationId: (() => {
       let count = 0
       return () => `${name}-${++count}`
@@ -103,22 +121,45 @@ export function createSimpleSyncHarness(): {
       id, name, type: 'expense', isSystem: false, sortOrder: 1, createdAt: timestamp,
     })
     const snapshot = async () => repository.exportSnapshot()
+    let engine = createSyncEngine({
+      userId,
+      workspace: await localDb.getWorkspaceSnapshot(),
+      repository,
+      transport: makeTransport(),
+    })
+    let engineUserId = userId
+    await engine.start()
+
+    const ensureCurrentEngine = async () => {
+      if (engineUserId === userId) return
+      await engine.stop()
+      engine = createSyncEngine({
+        userId,
+        workspace: await localDb.getWorkspaceSnapshot(),
+        repository,
+        transport: makeTransport(),
+      })
+      engineUserId = userId
+      await engine.start()
+    }
 
     return {
-      async offlineAddTransaction(id) { await activate(); await repository.upsert('transaction', transaction(id)) },
-      async addTransaction(id) { await activate(); await repository.upsert('transaction', transaction(id)) },
-      async updateTransaction(id, note) { await activate(); await repository.upsert('transaction', transaction(id, note)) },
-      async deleteTransaction(id) { await activate(); await repository.remove('transaction', id) },
-      async upsertCategory(id, name) { await activate(); await repository.upsert('category', category(id, name)) },
+      async goOffline() { online = false; onConnection?.(false) },
+      async goOnline() { online = true; onConnection?.(true) },
+      async addTransaction(id) { await repository.upsert('transaction', transaction(id)) },
+      async updateTransaction(id, note) { await repository.upsert('transaction', transaction(id, note)) },
+      async deleteTransaction(id) { await repository.remove('transaction', id) },
+      async upsertCategory(id, name) { await repository.upsert('category', category(id, name)) },
       async sync(options = {}) {
-        await activate()
-        const engine = createSyncEngine({ userId, workspace: await getWorkspaceSnapshot(), repository, transport: makeTransport(userId, options) })
+        await ensureCurrentEngine()
+        delayNextPull = options.delayPull ?? false
+        engine.wake('manual')
         await engine.start()
-        await engine.stop()
       },
-      async switchUser(nextUserId) { userId = nextUserId; await activate() },
-      async transactionIds() { await activate(); return (await snapshot()).transactions.map(row => row.id).sort() },
-      async categoryName(id) { await activate(); return (await snapshot()).categories.find(row => row.id === id)?.name },
+      async switchUser(nextUserId) { userId = nextUserId; await localDb.switchWorkspace({ kind: 'user', userId: workspaceUser() }) },
+      async transactionIds() { return (await snapshot()).transactions.map(row => row.id).sort() },
+      async categoryName(id) { return (await snapshot()).categories.find(row => row.id === id)?.name },
+      async pendingOperationCount() { return localDb.outboxOps.countPending() },
     }
   }
 

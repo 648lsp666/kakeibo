@@ -1,6 +1,6 @@
 # Automatic Multi-Device Sync Implementation Plan
 
-> **Superseded by [2026-07-15-simple-offline-sync.md](2026-07-15-simple-offline-sync.md).** This plan is retained as historical context and must not guide new runtime work.
+> **Superseded by [2026-07-15-simple-offline-sync-design.md](../specs/2026-07-15-simple-offline-sync-design.md).** This plan is retained as historical context and must not guide new runtime work.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
