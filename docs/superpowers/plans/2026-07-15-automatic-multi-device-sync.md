@@ -1,5 +1,7 @@
 # Automatic Multi-Device Sync Implementation Plan
 
+> **Superseded by [2026-07-15-simple-offline-sync.md](2026-07-15-simple-offline-sync.md).** This plan is retained as historical context and must not guide new runtime work.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add reliable, local-first, automatic multi-device synchronization for transactions, custom categories, budgets, and deletions under one personal Supabase account.

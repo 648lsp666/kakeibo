@@ -1,5 +1,7 @@
 # Kakeibo 全自动多设备同步设计
 
+> **Superseded by [2026-07-15-simple-offline-sync-design.md](2026-07-15-simple-offline-sync-design.md).** This document is retained as historical context and must not guide new runtime work.
+
 日期：2026-07-15
 
 ## 1. 目标
