@@ -165,6 +165,28 @@ describe('foreground sync engine', () => {
     }
   })
 
+  it.each([[429, 'rate-limit'], [503, 'transient']] as const)('retries an initial pull after HTTP %s even without outbox work', async (status, kind) => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    vi.setSystemTime(now)
+    try {
+      const pullAll = vi.fn()
+        .mockRejectedValueOnce(new SyncTransportError('retry pull', kind, status))
+        .mockResolvedValueOnce([])
+      const engine = createSyncEngine({
+        userId: 'user-1', workspace: await getWorkspaceSnapshot(), transport: transport({ pullAll }),
+        repository: repository(), now: () => new Date(Date.now()), random: () => 1,
+      })
+
+      await engine.start()
+      expect(pullAll).toHaveBeenCalledOnce()
+      await vi.advanceTimersByTimeAsync(2_500)
+      expect(pullAll).toHaveBeenCalledTimes(2)
+      await engine.stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('isolates only a protocol-invalid operation and continues with the next one', async () => {
     await outboxOps.add(pending('invalid'))
     await outboxOps.add(pending('valid'))
@@ -183,6 +205,26 @@ describe('foreground sync engine', () => {
     expect(await outboxOps.get('invalid')).toMatchObject({ state: 'isolated', lastError: 'bad payload' })
     expect(acknowledged).toEqual(['valid'])
     await engine.stop()
+  })
+
+  it('reconciles the persisted isolated count when an engine restarts', async () => {
+    await outboxOps.add(pending('invalid'))
+    const first = createSyncEngine({
+      userId: 'user-1', workspace: await getWorkspaceSnapshot(),
+      transport: transport({ push: vi.fn().mockRejectedValue(new SyncTransportError('bad payload', 'protocol', 400)) }),
+      repository: repository(), now: () => now,
+    })
+    await first.start()
+    await first.stop()
+
+    const second = createSyncEngine({
+      userId: 'user-1', workspace: await getWorkspaceSnapshot(), transport: transport(), repository: repository(), now: () => now,
+    })
+    await second.start()
+
+    expect(useSyncStore.getState().isolated).toBe(1)
+    expect(useSyncStore.getState().isolatedReason).toBe('bad payload')
+    await second.stop()
   })
 
   it('wakes a quiet engine from Realtime, network, visibility, and the wake bus', async () => {

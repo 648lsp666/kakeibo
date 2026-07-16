@@ -122,6 +122,17 @@ export function CloudSyncCard() {
               退出账号
             </button>
           </div>
+          {auth.isolated > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <InlineNotice tone="error">
+                <div>{auth.isolated} 项更改需要处理</div>
+                <div>{auth.isolatedReason ?? '这些更改暂时无法同步。'}</div>
+                <button type="button" className="secondary-button" disabled={busy} onClick={() => { void run(auth.retryIsolated) }} style={{ marginTop: 8 }}>
+                  重试这些项目
+                </button>
+              </InlineNotice>
+            </div>
+          )}
         </div>
       )}
 
@@ -156,7 +167,7 @@ export function CloudSyncCard() {
       <ConfirmDialog
         open={signOutOpen}
         title="退出同步账号？"
-        description={`仍有 ${signOutPending} 项待同步。退出后会保留在此账号的本地账本中。`}
+        description={`仍有 ${signOutPending} 项待同步。需要处理的项目会单独保留在此账号的本地账本中。`}
         confirmLabel="确认退出"
         busy={busy}
         error={notice?.tone === 'error' ? notice.text : undefined}

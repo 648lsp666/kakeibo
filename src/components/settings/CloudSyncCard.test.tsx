@@ -17,12 +17,14 @@ function auth(overrides: Record<string, unknown> = {}) {
     loading: false,
     migrationRequired: false,
     pending: 0,
+    isolated: 0,
     sendOtp: vi.fn().mockResolvedValue(undefined),
     confirmMigration: vi.fn().mockResolvedValue(undefined),
     skipMigration: vi.fn().mockResolvedValue(undefined),
     signOut: vi.fn().mockResolvedValue(undefined),
     prepareSignOut: vi.fn().mockResolvedValue(0),
     retry: vi.fn(),
+    retryIsolated: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }
 }
@@ -136,5 +138,19 @@ describe('CloudSyncCard', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('发送失败')
     expect(screen.getByRole('button', { name: '发送登录链接' })).toBeEnabled()
+  })
+
+  it('shows isolated changes with their reason and retries just those changes', async () => {
+    mocks.auth = auth({
+      session: { user: { id: 'user-1', email: 'reader@example.com' } },
+      isolated: 2,
+      isolatedReason: '内容格式无效',
+    })
+    render(<CloudSyncCard />)
+
+    expect(screen.getByText('2 项更改需要处理')).toBeInTheDocument()
+    expect(screen.getByText('内容格式无效')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '重试这些项目' }))
+    await waitFor(() => expect(mocks.auth.retryIsolated).toHaveBeenCalledOnce())
   })
 })

@@ -7,7 +7,7 @@ import { useSyncStore } from './sync-store'
 import { SyncTransportError } from './supabase-transport'
 
 export interface SyncEngine {
-  start(): Promise<void>
+  start(background?: boolean): Promise<void>
   wake(reason: 'local-write' | 'realtime' | 'online' | 'foreground' | 'manual'): void
   stop(): Promise<void>
 }
@@ -32,6 +32,7 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
   let retryTimer: ReturnType<typeof setTimeout> | null = null
   let connectionOnline = typeof navigator === 'undefined' || navigator.onLine
   let lifecycleGeneration = 0
+  let pullRetryCount = 0
 
   const isActiveWorkspace = () => running && isWorkspaceCurrent(input.workspace)
   const ownsLifecycle = (generation: number) => isActiveWorkspace() && lifecycleGeneration === generation
@@ -39,6 +40,13 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
     if (ownsLifecycle(generation)) useSyncStore.getState().setStatus(status)
   }
   const pendingCount = () => input.workspace.db.countFromIndex('outbox', 'by-state', 'pending')
+
+  async function reconcileIsolated(generation: number): Promise<void> {
+    if (!ownsLifecycle(generation)) return
+    const operations = await input.workspace.db.getAllFromIndex('outbox', 'by-state', 'isolated')
+    if (!ownsLifecycle(generation)) return
+    useSyncStore.getState().setIsolated(operations.length, operations[0]?.lastError)
+  }
 
   async function pendingOperations(): Promise<Array<PendingOperation & { enqueueOrder: number }>> {
     const operations = await input.workspace.db.getAllFromIndex('outbox', 'by-order')
@@ -91,7 +99,17 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
         lastError: error.message,
       }))
       if (!ownsLifecycle(generation)) return 'stop'
+      await reconcileIsolated(generation)
       return 'continue'
+    }
+    if (!operation && error instanceof SyncTransportError
+      && (error.kind === 'rate-limit' || error.kind === 'transient')) {
+      const delay = Math.min(2 ** ++pullRetryCount * 1000 + random() * 500, 300_000)
+      scheduleRetry(generation, delay)
+      setStatus(generation, connectionOnline
+        ? { kind: 'error', pending, message: error.message }
+        : { kind: 'offline', pending })
+      return 'stop'
     }
     if (operation && error instanceof SyncTransportError
       && (error.kind === 'rate-limit' || error.kind === 'transient')) {
@@ -132,6 +150,7 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
       return false
     }
     if (!ownsLifecycle(generation)) return false
+    pullRetryCount = 0
     await input.repository.applyCloudRecords(records)
     return ownsLifecycle(generation)
   }
@@ -223,7 +242,7 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
   }
 
   const engine: SyncEngine = {
-    async start() {
+    async start(background = false) {
       if (running) {
         await waitForLoop(lifecycleGeneration)
         return
@@ -265,7 +284,9 @@ export function createSyncEngine(input: SyncEngineInput): SyncEngine {
         return
       }
       realtimeUnsubscribe = unsubscribe
+      await reconcileIsolated(generation)
       requestLoop(generation)
+      if (background) return
       await waitForLoop(generation)
     },
 

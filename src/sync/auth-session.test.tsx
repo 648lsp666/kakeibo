@@ -97,6 +97,7 @@ function Harness() {
       <span data-testid="loading">{String(auth.loading)}</span>
       <span data-testid="email">{auth.session?.user.email ?? 'anonymous'}</span>
       <span data-testid="migration">{String(auth.migrationRequired)}</span>
+      <span data-testid="isolated">{String(auth.isolated)}</span>
       <button onClick={() => void auth.sendOtp('reader@example.com')}>otp</button>
       <button onClick={() => void auth.confirmMigration()}>confirm</button>
       <button onClick={() => void auth.skipMigration()}>skip</button>
@@ -167,6 +168,19 @@ describe('AuthSyncProvider', () => {
     await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
     expect(mocks.active).toEqual({ kind: 'anonymous' })
     expect(mocks.createEngine).not.toHaveBeenCalled()
+  })
+
+  it('makes the signed-in local workspace usable while the first pull is still pending', async () => {
+    installMarker('user-1')
+    const client = createAuthClient(session())
+    mocks.getClient.mockReturnValue(client as any)
+    const start = vi.fn((background?: boolean) => background ? Promise.resolve() : new Promise<void>(() => undefined))
+    mocks.createEngine.mockReturnValue({ start, stop: vi.fn().mockResolvedValue(undefined), wake: vi.fn() })
+    render(<AuthSyncProvider><Harness /></AuthSyncProvider>)
+
+    await waitFor(() => expect(screen.getByTestId('email')).toHaveTextContent('reader@example.com'))
+    expect(screen.getByTestId('loading')).toHaveTextContent('false')
+    expect(start).toHaveBeenCalledWith(true)
   })
 
   it('uses a magic-link OTP redirect to the current web origin', async () => {

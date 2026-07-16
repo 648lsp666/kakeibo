@@ -332,6 +332,25 @@ export const outboxOps = {
     const db = await getActiveWorkspace()
     return db.countFromIndex('outbox', 'by-state', 'pending')
   },
+
+  async isolated(): Promise<PendingOperation[]> {
+    const db = await getActiveWorkspace()
+    return (await db.getAllFromIndex('outbox', 'by-order'))
+      .filter(operation => operation.state === 'isolated')
+      .map(withoutEnqueueOrder)
+  },
+
+  async retryIsolated(): Promise<number> {
+    const timestamp = new Date().toISOString()
+    return withWorkspaceWrite(['outbox'], async tx => {
+      const outbox = tx.objectStore('outbox')
+      const operations = await outbox.index('by-state').getAll('isolated')
+      for (const operation of operations) {
+        await outbox.put({ ...operation, state: 'pending', attemptCount: 0, nextAttemptAt: timestamp, lastError: undefined })
+      }
+      return operations.length
+    })
+  },
 }
 
 export const syncMetaOps = {

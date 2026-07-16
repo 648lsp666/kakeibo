@@ -20,12 +20,15 @@ export interface AuthSyncContextValue {
   loading: boolean
   migrationRequired: boolean
   pending: number
+  isolated: number
+  isolatedReason?: string
   sendOtp(email: string): Promise<void>
   confirmMigration(): Promise<void>
   skipMigration(): Promise<void>
   prepareSignOut(): Promise<number>
   signOut(): Promise<void>
   retry(): void
+  retryIsolated(): Promise<void>
 }
 
 interface AnonymousMigrationService {
@@ -143,6 +146,8 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [migrationRequired, setMigrationRequired] = useState(false)
   const syncStatus = useSyncStore(state => state.status)
+  const isolated = useSyncStore(state => state.isolated)
+  const isolatedReason = useSyncStore(state => state.isolatedReason)
   const clientRef = useRef<SupabaseClient | null>(null)
   const engineRef = useRef<SyncEngine | null>(null)
   const queueRef = useRef<Promise<void>>(Promise.resolve())
@@ -221,7 +226,7 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
       repository: domainRepository,
     })
     engineRef.current = engine
-    await engine.start()
+    await engine.start(true)
     if (!mayExposeAction(token)) {
       if (engineRef.current === engine) engineRef.current = null
       await engine.stop()
@@ -454,18 +459,29 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
     engineRef.current?.wake('manual')
   }, [scheduleTransition])
 
+  const retryIsolated = useCallback(async () => {
+    const retried = await outboxOps.retryIsolated()
+    if (retried > 0) {
+      useSyncStore.getState().setIsolated(0)
+      engineRef.current?.wake('manual')
+    }
+  }, [])
+
   const value = useMemo<AuthSyncContextValue>(() => ({
     session,
     loading,
     migrationRequired,
     pending: 'pending' in syncStatus ? syncStatus.pending : 0,
+    isolated,
+    isolatedReason,
     sendOtp,
     confirmMigration,
     skipMigration,
     prepareSignOut,
     signOut,
     retry,
-  }), [confirmMigration, loading, migrationRequired, prepareSignOut, retry, sendOtp, session, signOut, skipMigration, syncStatus])
+    retryIsolated,
+  }), [confirmMigration, isolated, isolatedReason, loading, migrationRequired, prepareSignOut, retry, retryIsolated, sendOtp, session, signOut, skipMigration, syncStatus])
 
   return <AuthSyncContext.Provider value={value}>{children}</AuthSyncContext.Provider>
 }

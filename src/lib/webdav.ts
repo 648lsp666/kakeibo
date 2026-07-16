@@ -1,4 +1,5 @@
 import { transactionOps, categoryOps, syncConfigOps } from './db'
+import { domainRepository } from '../sync/domain-repository'
 
 export interface WebDAVCredentials {
   url: string
@@ -45,19 +46,22 @@ export async function downloadAndMerge(creds: WebDAVCredentials): Promise<{ adde
   const data = await res.json() as { transactions: any[]; categories: any[] }
   let added = 0, updated = 0
 
-  const allLocal = await transactionOps.getAll()
-  const localMap = Object.fromEntries(allLocal.map(t => [t.id, t]))
+  const local = await domainRepository.exportSnapshot()
+  const localMap = Object.fromEntries(local.transactions.map(t => [t.id, t]))
+  const addedRecords = []
 
   for (const tx of data.transactions ?? []) {
     const existing = localMap[tx.id]
     if (!existing) {
-      await transactionOps.add(tx)
+      addedRecords.push(tx)
       added++
     } else if (tx.updatedAt > existing.updatedAt) {
-      await transactionOps.update(tx)
+      await domainRepository.upsert('transaction', tx)
       updated++
     }
   }
+
+  if (addedRecords.length > 0) await domainRepository.importTransactions(addedRecords)
 
   await syncConfigOps.set('last_sync_at', new Date().toISOString())
   return { added, updated }
