@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { getDb, transactionOps, categoryOps, syncConfigOps } from './db'
-import type { Transaction, Category } from '../types'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { getDb, transactionOps, categoryOps, syncConfigOps, budgetOps } from './db'
+import { switchWorkspace } from '../sync/local-db'
+import type { Transaction, Category, BudgetRule } from '../types'
 
 const mockTx = (): Transaction => ({
   id: 'tx-1',
@@ -25,9 +26,11 @@ const mockCat = (): Category => ({
 })
 
 beforeEach(async () => {
+  await switchWorkspace({ kind: 'anonymous' })
   const db = await getDb()
   await db.clear('transactions')
   await db.clear('categories')
+  await db.clear('budgets')
   await db.clear('sync_config')
 })
 
@@ -53,6 +56,31 @@ describe('transactionOps', () => {
     await transactionOps.delete('tx-1')
     const result = await transactionOps.getByMonth('2026-06')
     expect(result).toHaveLength(0)
+  })
+
+  it('binds addMany duplicate checks and writes to one database transaction', async () => {
+    const db = await getDb()
+    const transactionSpy = vi.spyOn(db, 'transaction')
+
+    await transactionOps.addMany([
+      { ...mockTx(), id: 'batch-1', externalId: 'batch-ext-1' },
+      { ...mockTx(), id: 'batch-2', externalId: 'batch-ext-2' },
+    ])
+
+    expect(transactionSpy).toHaveBeenCalledTimes(1)
+    expect(await db.getAll('transactions')).toHaveLength(2)
+  })
+
+  it('rolls back addMany and reports the original request failure without an unhandled abort', async () => {
+    const db = await getDb()
+    const invalid = { ...mockTx(), id: undefined } as unknown as Transaction
+
+    await expect(transactionOps.addMany([
+      { ...mockTx(), id: 'before-failure' },
+      invalid,
+    ])).rejects.toMatchObject({ name: 'DataError' })
+
+    expect(await db.getAll('transactions')).toEqual([])
   })
 })
 
@@ -83,5 +111,33 @@ describe('syncConfigOps', () => {
   it('returns undefined for missing key', async () => {
     const val = await syncConfigOps.get('missing_key')
     expect(val).toBeUndefined()
+  })
+})
+
+describe('budgetOps', () => {
+  it('lists, updates, and deletes first-class budget rows', async () => {
+    const budget: BudgetRule = { id: 'budget-1', amount: 2000, period: 'monthly' }
+    await budgetOps.add(budget)
+
+    expect(await budgetOps.list()).toEqual([budget])
+
+    await budgetOps.update({ ...budget, amount: 2500 })
+    expect(await budgetOps.list()).toEqual([{ ...budget, amount: 2500 }])
+
+    await budgetOps.delete(budget.id)
+    expect(await budgetOps.list()).toEqual([])
+  })
+})
+
+describe('active workspace binding', () => {
+  it('resolves the active workspace for every operation', async () => {
+    await switchWorkspace({ kind: 'user', userId: 'db-ops-a' })
+    await transactionOps.add(mockTx())
+
+    await switchWorkspace({ kind: 'user', userId: 'db-ops-b' })
+    expect(await transactionOps.getAll()).toEqual([])
+
+    await switchWorkspace({ kind: 'user', userId: 'db-ops-a' })
+    expect(await transactionOps.getAll()).toHaveLength(1)
   })
 })

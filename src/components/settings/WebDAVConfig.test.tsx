@@ -37,6 +37,15 @@ describe('WebDAVConfig', () => {
     mocks.downloadAndMerge.mockResolvedValue({ added: 0, updated: 0 })
   })
 
+  it('presents WebDAV as manual disaster recovery outside automatic sync', async () => {
+    render(<WebDAVConfig />)
+
+    expect(screen.getByRole('heading', { name: '手动灾备' })).toBeInTheDocument()
+    expect(screen.getByText(/不参与自动同步/)).toBeInTheDocument()
+    expect(screen.getByText(/请先退出账号并在本机模式恢复/)).toBeInTheDocument()
+    await waitFor(() => expect(mocks.getAll).toHaveBeenCalledOnce())
+  })
+
   it('keeps the global focus outline and uses the safe small-text token', async () => {
     render(<WebDAVConfig />)
 

@@ -29,6 +29,7 @@ export function TransactionItem({ tx, category, onDelete }: Props) {
   const isExpense = tx.type === 'expense'
   const sign = isExpense ? '-' : '+'
   const amtColor = isExpense ? 'var(--color-expense-text)' : 'var(--color-income-text)'
+  const rowBackground = isExpense ? 'var(--color-expense-soft)' : 'var(--color-income-soft)'
 
   const x = useMotionValue(0)
   const isOpen = useRef(false)
@@ -51,12 +52,13 @@ export function TransactionItem({ tx, category, onDelete }: Props) {
       {/* Delete button revealed on left swipe */}
       <div style={{
         position: 'absolute', right: 0, top: 0, bottom: 0, width: DELETE_W,
-        background: 'var(--color-expense)',
+        background: 'var(--color-danger)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <button
           type="button"
           aria-label={`滑动删除${itemLabel}`}
+          data-transaction-delete-id={tx.id}
           tabIndex={-1}
           onClick={() => onDelete(tx.id)}
           style={{ width: '100%', height: '100%', color: 'var(--color-on-danger)', background: 'none', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 10px', lineHeight: 1.4, textAlign: 'center', display: 'grid', justifyItems: 'center', alignContent: 'center', gap: 3 }}
@@ -68,7 +70,7 @@ export function TransactionItem({ tx, category, onDelete }: Props) {
 
       {/* Swipeable row */}
       <motion.div
-        style={{ x, position: 'relative', zIndex: 1, background: 'var(--color-bg-card)', display: 'flex', alignItems: 'center', gap: 11, padding: '12px 13px', touchAction: 'pan-y' }}
+        style={{ x, position: 'relative', zIndex: 1, background: rowBackground, display: 'flex', alignItems: 'center', gap: 11, padding: '12px 13px', touchAction: 'pan-y' }}
         drag="x"
         dragConstraints={{ left: -DELETE_W, right: 0 }}
         dragElastic={0.05}
@@ -101,16 +103,6 @@ export function TransactionItem({ tx, category, onDelete }: Props) {
         <div style={{ fontSize: 15, fontWeight: 800, color: amtColor, flexShrink: 0 }}>
           {sign}¥{tx.amount.toFixed(2)}
         </div>
-        <button
-          type="button"
-          aria-label={`删除${itemLabel}`}
-          data-transaction-delete-id={tx.id}
-          onClick={(event) => { event.stopPropagation(); onDelete(tx.id) }}
-          className="icon-button"
-          style={{ color: 'var(--color-text-secondary)', flexShrink: 0 }}
-        >
-          <Icon name="trash" size={17} />
-        </button>
       </motion.div>
     </li>
   )

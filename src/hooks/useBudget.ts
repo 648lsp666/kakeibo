@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { nanoid } from 'nanoid'
-import { syncConfigOps, transactionOps } from '../lib/db'
+import { budgetOps, transactionOps } from '../lib/db'
 import { useAppStore } from '../store/appStore'
 import type { BudgetRule, BudgetStatus, Transaction } from '../types'
+import { domainRepository } from '../sync/domain-repository'
 
 function daysBetween(a: string, b: string): number {
   return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000)
@@ -68,8 +69,6 @@ function computeStatus(rule: BudgetRule, all: Transaction[]): BudgetStatus {
 
 export type RuleWithStatus = BudgetStatus & { rule: BudgetRule }
 
-const STORAGE_KEY = 'budgets'
-
 export function useBudget() {
   const [rules, setRules] = useState<BudgetRule[]>([])
   const [statuses, setStatuses] = useState<RuleWithStatus[]>([])
@@ -78,8 +77,7 @@ export function useBudget() {
   const triggerRefresh = useAppStore(s => s.triggerRefresh)
 
   const load = useCallback(async () => {
-    const raw = await syncConfigOps.get(STORAGE_KEY)
-    const list: BudgetRule[] = raw ? JSON.parse(raw) : []
+    const list = await budgetOps.list()
     setRules(list)
     if (list.length === 0) { setStatuses([]); return }
     const all = await transactionOps.getAll()
@@ -88,8 +86,7 @@ export function useBudget() {
 
   useEffect(() => { load() }, [load])
 
-  const persist = async (updated: BudgetRule[]) => {
-    await syncConfigOps.set(STORAGE_KEY, JSON.stringify(updated))
+  const publish = async (updated: BudgetRule[]) => {
     // Update this instance immediately, then signal other instances to reload
     setRules(updated)
     const all = await transactionOps.getAll()
@@ -97,14 +94,21 @@ export function useBudget() {
     triggerRefresh()
   }
 
-  const addRule = (data: Omit<BudgetRule, 'id'>) =>
-    persist([...rules, { ...data, id: nanoid() }])
+  const addRule = async (data: Omit<BudgetRule, 'id'>) => {
+    const rule = { ...data, id: nanoid() }
+    await domainRepository.upsert('budget', rule)
+    await publish([...rules, rule])
+  }
 
-  const updateRule = (updated: BudgetRule) =>
-    persist(rules.map(r => r.id === updated.id ? updated : r))
+  const updateRule = async (updated: BudgetRule) => {
+    await domainRepository.upsert('budget', updated)
+    await publish(rules.map(r => r.id === updated.id ? updated : r))
+  }
 
-  const deleteRule = (id: string) =>
-    persist(rules.filter(r => r.id !== id))
+  const deleteRule = async (id: string) => {
+    await domainRepository.remove('budget', id)
+    await publish(rules.filter(r => r.id !== id))
+  }
 
   // Monthly equivalent for chart budget line
   const monthlyBudgetAmount = (() => {

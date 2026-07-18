@@ -23,10 +23,19 @@ export interface MonthTrend {
   income: number
 }
 
+export interface DailyStat {
+  date: string
+  expense: number
+  income: number
+  net: number
+  count: number
+}
+
 export function useStats(yearMonth: string) {
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([])
   const [merchantStats, setMerchantStats] = useState<MerchantStat[]>([])
   const [monthlyTrend, setMonthlyTrend] = useState<MonthTrend[]>([])
+  const [dailyStats, setDailyStats] = useState<DailyStat[]>([])
   const [totalExpense, setTotalExpense] = useState(0)
   const [totalIncome, setTotalIncome] = useState(0)
   const refreshSignal = useAppStore(s => s.refreshSignal)
@@ -44,6 +53,17 @@ export function useStats(yearMonth: string) {
       const income = incTxs.reduce((s, t) => s + t.amount, 0)
       setTotalExpense(expense)
       setTotalIncome(income)
+
+      const dailyMap = new Map<string, DailyStat>()
+      for (const tx of monthTxs) {
+        const current = dailyMap.get(tx.date) ?? { date: tx.date, expense: 0, income: 0, net: 0, count: 0 }
+        if (tx.type === 'expense') current.expense += tx.amount
+        else current.income += tx.amount
+        current.net = current.income - current.expense
+        current.count += 1
+        dailyMap.set(tx.date, current)
+      }
+      setDailyStats([...dailyMap.values()].sort((a, b) => a.date.localeCompare(b.date)))
 
       const catMap = new Map<string, number>()
       for (const tx of expTxs) {
@@ -67,10 +87,10 @@ export function useStats(yearMonth: string) {
         .map(([name, { amount, count }]) => ({ name, amount, count, pct: expense > 0 ? amount / expense : 0 }))
       setMerchantStats(mStats)
 
-      // 6-month trend ending at yearMonth
+      // 12-month trend ending at yearMonth; consumers can show a shorter window.
       const [y, m] = yearMonth.split('-').map(Number)
       const trend: MonthTrend[] = []
-      for (let i = 5; i >= 0; i--) {
+      for (let i = 11; i >= 0; i--) {
         const d = new Date(y, m - 1 - i)
         const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
         const txs = all.filter(tx => tx.date.startsWith(ym))
@@ -86,5 +106,5 @@ export function useStats(yearMonth: string) {
     load()
   }, [yearMonth, refreshSignal])
 
-  return { categoryStats, merchantStats, monthlyTrend, totalExpense, totalIncome }
+  return { categoryStats, merchantStats, monthlyTrend, dailyStats, totalExpense, totalIncome }
 }

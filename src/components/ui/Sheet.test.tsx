@@ -87,6 +87,15 @@ it('uses the semantic small-text token for the description', () => {
   })
 })
 
+it('keeps the surface fixed while only the body scrolls and the footer respects safe areas', () => {
+  motionMock.reducedMotion.mockReturnValue(false)
+  render(<Sheet open title="测试" onClose={() => undefined} footer={<button>保存</button>}>内容</Sheet>)
+
+  expect(screen.getByRole('dialog')).toHaveStyle({ maxHeight: '90dvh', overflow: 'hidden', display: 'flex' })
+  expect(screen.getByText('内容').closest('[data-sheet-body]')).toHaveStyle({ overflowY: 'auto', overscrollBehavior: 'contain' })
+  expect(screen.getByText('保存').closest('[data-sheet-footer]')).toHaveStyle({ flexShrink: '0' })
+})
+
 it('moves focus to the preferred autofocus control when opened', () => {
   motionMock.reducedMotion.mockReturnValue(false)
 

@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { categoryOps, getDb } from '../lib/db'
+import { outboxOps } from '../sync/local-db'
 import type { NewCategoryInput } from './useCategories'
 import { useCategories } from './useCategories'
 
@@ -11,6 +12,8 @@ vi.mock('../lib/seed', () => ({
 beforeEach(async () => {
   const db = await getDb()
   await db.clear('categories')
+  await db.clear('outbox')
+  await db.clear('sync_meta')
 })
 
 it('persists only category fields accepted at the hook boundary', async () => {
@@ -32,4 +35,12 @@ it('persists only category fields accepted at the hook boundary', async () => {
   const [stored] = await categoryOps.list()
   expect(stored).toMatchObject({ name: '咖啡', icon: 'coffee', type: 'expense' })
   expect(Object.prototype.hasOwnProperty.call(stored, 'emoji')).toBe(false)
+  expect(await outboxOps.pending()).toEqual([
+    expect.objectContaining({
+      entityType: 'category',
+      entityId: stored.id,
+      operation: 'upsert',
+      payload: stored,
+    }),
+  ])
 })

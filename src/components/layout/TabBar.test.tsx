@@ -29,3 +29,10 @@ it('uses the contrast-safe small-text token for inactive tab labels', () => {
     expect(screen.getByRole('button', { name: label })).toHaveStyle({ color: 'var(--color-text-small)' })
   }
 })
+
+it('opts every navigation action into restrained press feedback', () => {
+  render(<TabBar />)
+  for (const label of ['账单', '统计', '记一笔', '分类', '设置']) {
+    expect(screen.getByRole('button', { name: label })).toHaveClass('tab-button')
+  }
+})

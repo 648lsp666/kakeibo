@@ -36,7 +36,7 @@ it('fills the 72px swipe reveal area with the delete target', () => {
     height: '100%',
     color: 'var(--color-on-danger)',
   })
-  expect(deleteButton.parentElement).toHaveStyle({ background: 'var(--color-expense)' })
+  expect(deleteButton.parentElement).toHaveStyle({ background: 'var(--color-danger)' })
 })
 
 it('uses centralized semantic tokens for imported source badges', () => {
@@ -82,17 +82,20 @@ it('uses semantic text tokens for expense and income amounts', () => {
   expect(screen.getByText('+¥25.00')).toHaveStyle({ color: 'var(--color-income-text)' })
 })
 
-it('offers a visible keyboard delete action and keeps the covered swipe action out of the tab order', async () => {
-  const user = userEvent.setup()
+it('uses different semantic backgrounds for expense and income rows', () => {
+  const { rerender } = render(<TransactionItem tx={transaction} onDelete={vi.fn()} />)
+  expect(screen.getByText('-¥25.00').closest('[style*="touch-action"]')).toHaveStyle({ background: 'var(--color-expense-soft)' })
+
+  rerender(<TransactionItem tx={{ ...transaction, type: 'income' }} onDelete={vi.fn()} />)
+  expect(screen.getByText('+¥25.00').closest('[style*="touch-action"]')).toHaveStyle({ background: 'var(--color-income-soft)' })
+})
+
+it('only exposes deletion through the swipe action', () => {
   render(<TransactionItem tx={transaction} onDelete={vi.fn()} />)
 
-  const keyboardAction = screen.getByRole('button', { name: '删除午餐' })
-  const swipeAction = screen.getByRole('button', { name: '滑动删除午餐', hidden: true })
-  expect(keyboardAction).toBeVisible()
+  const swipeAction = screen.getByRole('button', { name: '滑动删除午餐' })
   expect(swipeAction).toHaveAttribute('tabindex', '-1')
-
-  await user.tab()
-  expect(keyboardAction).toHaveFocus()
+  expect(screen.queryByRole('button', { name: '删除午餐' })).not.toBeInTheDocument()
 })
 
 it('uses the custom confirmation dialog, cancels without deleting, and restores focus', async () => {
@@ -101,7 +104,7 @@ it('uses the custom confirmation dialog, cancels without deleting, and restores 
   const nativeConfirm = vi.spyOn(window, 'confirm')
   render(<TransactionList transactions={[transaction]} categories={[]} onDelete={onDelete} />)
 
-  const trigger = screen.getByRole('button', { name: '删除午餐' })
+  const trigger = screen.getByRole('button', { name: '滑动删除午餐' })
   trigger.focus()
   await user.click(trigger)
 
@@ -132,7 +135,7 @@ it('uses the category name in delete confirmation when the transaction has no no
     />,
   )
 
-  await user.click(screen.getByRole('button', { name: '删除餐饮' }))
+  await user.click(screen.getByRole('button', { name: '滑动删除餐饮' }))
 
   expect(screen.getByText('确定删除「餐饮」吗？删除后无法恢复。')).toBeInTheDocument()
 })
@@ -141,7 +144,7 @@ it('uses the generic record label when neither note nor category is available', 
   const user = userEvent.setup()
   render(<TransactionList transactions={[{ ...transaction, note: '', categoryId: 'unknown' }]} categories={[]} onDelete={vi.fn()} />)
 
-  await user.click(screen.getByRole('button', { name: '删除记录' }))
+  await user.click(screen.getByRole('button', { name: '滑动删除记录' }))
 
   expect(screen.getByText('确定删除「记录」吗？删除后无法恢复。')).toBeInTheDocument()
 })
@@ -156,13 +159,13 @@ it('confirms deletion once and restores focus after the custom dialog closes', a
   }
   render(<RemovingList />)
 
-  const trigger = screen.getByRole('button', { name: '删除午餐' })
+  const trigger = screen.getByRole('button', { name: '滑动删除午餐' })
   await user.click(trigger)
   await user.click(screen.getByRole('button', { name: '确认删除' }))
 
   expect(onDelete).toHaveBeenCalledOnce()
   expect(onDelete).toHaveBeenCalledWith(transaction.id)
-  await waitFor(() => expect(screen.getByRole('button', { name: '删除晚餐' })).toHaveFocus())
+  await waitFor(() => expect(screen.getByRole('button', { name: '滑动删除晚餐' })).toHaveFocus())
 })
 
 it('moves focus to the ledger region when confirming removes the final item', async () => {
@@ -173,7 +176,7 @@ it('moves focus to the ledger region when confirming removes the final item', as
   }
   render(<RemovingList />)
 
-  await user.click(screen.getByRole('button', { name: '删除午餐' }))
+  await user.click(screen.getByRole('button', { name: '滑动删除午餐' }))
   await user.click(screen.getByRole('button', { name: '确认删除' }))
 
   await waitFor(() => expect(screen.getByRole('region', { name: '交易记录' })).toHaveFocus())
@@ -192,7 +195,7 @@ it('keeps the dialog open, reports delete rejection, and allows retry', async ()
   }
   render(<RetryList />)
 
-  await user.click(screen.getByRole('button', { name: '删除午餐' }))
+  await user.click(screen.getByRole('button', { name: '滑动删除午餐' }))
   await user.click(screen.getByRole('button', { name: '确认删除' }))
 
   expect(await screen.findByRole('alert')).toHaveTextContent('删除失败：数据库不可用')
@@ -208,7 +211,7 @@ it('allows cancel after a rejected delete and restores the trigger focus', async
   const user = userEvent.setup()
   render(<TransactionList transactions={[transaction]} categories={[]} onDelete={vi.fn().mockRejectedValue(new Error('失败'))} />)
 
-  const trigger = screen.getByRole('button', { name: '删除午餐' })
+  const trigger = screen.getByRole('button', { name: '滑动删除午餐' })
   await user.click(trigger)
   await user.click(screen.getByRole('button', { name: '确认删除' }))
   await screen.findByRole('alert')
@@ -226,10 +229,10 @@ it('focuses the adjacent row across date groups after actual removal', async () 
   }
   render(<MultiDateList />)
 
-  await user.click(screen.getByRole('button', { name: '删除午餐' }))
+  await user.click(screen.getByRole('button', { name: '滑动删除午餐' }))
   await user.click(screen.getByRole('button', { name: '确认删除' }))
 
-  await waitFor(() => expect(screen.getByRole('button', { name: '删除晚餐' })).toHaveFocus())
+  await waitFor(() => expect(screen.getByRole('button', { name: '滑动删除晚餐' })).toHaveFocus())
 })
 
 it('waits for the flattened transaction props to update before closing and focusing', async () => {
@@ -243,7 +246,7 @@ it('waits for the flattened transaction props to update before closing and focus
   }
   render(<DeferredList />)
 
-  await user.click(screen.getByRole('button', { name: '删除午餐' }))
+  await user.click(screen.getByRole('button', { name: '滑动删除午餐' }))
   await user.click(screen.getByRole('button', { name: '确认删除' }))
   await act(async () => resolvePersistence())
 
@@ -251,5 +254,5 @@ it('waits for the flattened transaction props to update before closing and focus
   expect(screen.getByRole('button', { name: '关闭' })).toBeDisabled()
 
   await act(async () => removePersisted())
-  await waitFor(() => expect(screen.getByRole('button', { name: '删除晚餐' })).toHaveFocus())
+  await waitFor(() => expect(screen.getByRole('button', { name: '滑动删除晚餐' })).toHaveFocus())
 })

@@ -1,0 +1,480 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0B6419FEE8C9813527D45241 /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 035F61FE37CB402E271C34F8 /* libapp.a */; };
+		1FA606AB0A17AB4089906DE1 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1BC3FBCA7E91AFFBF1711CFD /* UIKit.framework */; };
+		2262CED02FAA4FE0BFE03F3E /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 1B712A1A691B3E6BC441EEB7 /* assets */; };
+		4D3D96F0CC45513CBB35373F /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0D79775EF4B870DC8B80F903 /* CoreGraphics.framework */; };
+		5387B78EE5ED9C23B98009F1 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = B5468DD22F09E7E5B6716A63 /* main.mm */; };
+		816BCA707554600D3B7F94BC /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60891E7474D423981FAA05D9 /* Security.framework */; };
+		86EDAA02C84638965D54D5F3 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CB97C59F2ACF29B12284043 /* Metal.framework */; };
+		9FA240E1518BE1EDC9849EA4 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5AA7CA796027A2FA63A89EE7 /* WebKit.framework */; };
+		9FCEA11A96041AC58AC1BD0F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = EE6E77EE0B562516C1DC2886 /* LaunchScreen.storyboard */; };
+		AEDD3B13B7C5B99A21FD1FB3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3108B4E9C122D37534DCD915 /* Assets.xcassets */; };
+		CCE2F96E71D00C120E70FF8E /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EC64A779141635CC249FF586 /* QuartzCore.framework */; };
+		E2BE8C36908EBBB14B626F55 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5F11633D1111B05720449389 /* MetalKit.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		035F61FE37CB402E271C34F8 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		0CB97C59F2ACF29B12284043 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		0D79775EF4B870DC8B80F903 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		1B712A1A691B3E6BC441EEB7 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		1BC3FBCA7E91AFFBF1711CFD /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		1EE512D92F92D540D1387C3D /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		3108B4E9C122D37534DCD915 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		5502FE49EA5058EEA2F16E70 /* 家計簿 Kakeibo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "家計簿 Kakeibo.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		5AA7CA796027A2FA63A89EE7 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		5F11633D1111B05720449389 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		60891E7474D423981FAA05D9 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		85F95E9D456BC43861CF79F3 /* main.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = main.rs; sourceTree = "<group>"; };
+		9C42650D44DE0144F2A790AB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		B5468DD22F09E7E5B6716A63 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		CC595B4CFAB33B2B736C8560 /* kakeibo_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = kakeibo_iOS.entitlements; sourceTree = "<group>"; };
+		EC64A779141635CC249FF586 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		EE6E77EE0B562516C1DC2886 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		FF254235DDA0F8078F08E634 /* lib.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = lib.rs; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		ACD456CC375A5672A3F8A8F8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0B6419FEE8C9813527D45241 /* libapp.a in Frameworks */,
+				4D3D96F0CC45513CBB35373F /* CoreGraphics.framework in Frameworks */,
+				86EDAA02C84638965D54D5F3 /* Metal.framework in Frameworks */,
+				E2BE8C36908EBBB14B626F55 /* MetalKit.framework in Frameworks */,
+				CCE2F96E71D00C120E70FF8E /* QuartzCore.framework in Frameworks */,
+				816BCA707554600D3B7F94BC /* Security.framework in Frameworks */,
+				1FA606AB0A17AB4089906DE1 /* UIKit.framework in Frameworks */,
+				9FA240E1518BE1EDC9849EA4 /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		257C2B6AE11186550AE77AB0 /* kakeibo_iOS */ = {
+			isa = PBXGroup;
+			children = (
+				9C42650D44DE0144F2A790AB /* Info.plist */,
+				CC595B4CFAB33B2B736C8560 /* kakeibo_iOS.entitlements */,
+			);
+			path = kakeibo_iOS;
+			sourceTree = "<group>";
+		};
+		447674EA4A71228F1424BF7E /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				C3DCD65391066847157CC1A8 /* kakeibo */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		5436A907DCA9D9BC087D1A3B /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Externals;
+			sourceTree = "<group>";
+		};
+		925F58D71104A15A9E2B2531 = {
+			isa = PBXGroup;
+			children = (
+				1B712A1A691B3E6BC441EEB7 /* assets */,
+				3108B4E9C122D37534DCD915 /* Assets.xcassets */,
+				EE6E77EE0B562516C1DC2886 /* LaunchScreen.storyboard */,
+				5436A907DCA9D9BC087D1A3B /* Externals */,
+				257C2B6AE11186550AE77AB0 /* kakeibo_iOS */,
+				447674EA4A71228F1424BF7E /* Sources */,
+				CA20D230FA63E2C2A87CAB00 /* src */,
+				F030B9F57054CEAF92910CE3 /* Frameworks */,
+				B30F18A89548CEC26B778DA7 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B30F18A89548CEC26B778DA7 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5502FE49EA5058EEA2F16E70 /* 家計簿 Kakeibo.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C3DCD65391066847157CC1A8 /* kakeibo */ = {
+			isa = PBXGroup;
+			children = (
+				B5468DD22F09E7E5B6716A63 /* main.mm */,
+				F9D9BD50415524F6020D892B /* bindings */,
+			);
+			path = kakeibo;
+			sourceTree = "<group>";
+		};
+		CA20D230FA63E2C2A87CAB00 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				FF254235DDA0F8078F08E634 /* lib.rs */,
+				85F95E9D456BC43861CF79F3 /* main.rs */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+		F030B9F57054CEAF92910CE3 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				0D79775EF4B870DC8B80F903 /* CoreGraphics.framework */,
+				035F61FE37CB402E271C34F8 /* libapp.a */,
+				0CB97C59F2ACF29B12284043 /* Metal.framework */,
+				5F11633D1111B05720449389 /* MetalKit.framework */,
+				EC64A779141635CC249FF586 /* QuartzCore.framework */,
+				60891E7474D423981FAA05D9 /* Security.framework */,
+				1BC3FBCA7E91AFFBF1711CFD /* UIKit.framework */,
+				5AA7CA796027A2FA63A89EE7 /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		F9D9BD50415524F6020D892B /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				1EE512D92F92D540D1387C3D /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2CC6682871A418CFB0EA30CE /* kakeibo_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B8DF9961AA7EB840D1476D94 /* Build configuration list for PBXNativeTarget "kakeibo_iOS" */;
+			buildPhases = (
+				30D7ECD0D38BE8472A7B96D0 /* Build Rust Code */,
+				40E42150E04BBDF7643DFD70 /* Sources */,
+				5C1C7592320438472D928538 /* Resources */,
+				ACD456CC375A5672A3F8A8F8 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = kakeibo_iOS;
+			packageProductDependencies = (
+			);
+			productName = kakeibo_iOS;
+			productReference = 5502FE49EA5058EEA2F16E70 /* 家計簿 Kakeibo.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B0019D24E5337F6A97CB2DBB /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+			};
+			buildConfigurationList = CB5E7C46A82C8FFEBA0EEF17 /* Build configuration list for PBXProject "kakeibo" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 925F58D71104A15A9E2B2531;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = B30F18A89548CEC26B778DA7 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				2CC6682871A418CFB0EA30CE /* kakeibo_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		5C1C7592320438472D928538 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AEDD3B13B7C5B99A21FD1FB3 /* Assets.xcassets in Resources */,
+				9FCEA11A96041AC58AC1BD0F /* LaunchScreen.storyboard in Resources */,
+				2262CED02FAA4FE0BFE03F3E /* assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		30D7ECD0D38BE8472A7B96D0 /* Build Rust Code */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Code";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a",
+				"$(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "npm run -- tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		40E42150E04BBDF7643DFD70 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5387B78EE5ED9C23B98009F1 /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		0777363AA8048D7B5F3991C7 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = kakeibo_iOS/kakeibo_iOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = H4TU68G6KB;
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = kakeibo_iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = best.kakeibo.client;
+				PRODUCT_NAME = "家計簿 Kakeibo";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = debug;
+		};
+		7B0AB9FF0792B61B25D73E48 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = kakeibo_iOS/kakeibo_iOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = H4TU68G6KB;
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = kakeibo_iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = best.kakeibo.client;
+				PRODUCT_NAME = "家計簿 Kakeibo";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+		856C06630167A086125BD2C6 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = debug;
+		};
+		BCF234FF7ADC6D13E0E8D302 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B8DF9961AA7EB840D1476D94 /* Build configuration list for PBXNativeTarget "kakeibo_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0777363AA8048D7B5F3991C7 /* debug */,
+				7B0AB9FF0792B61B25D73E48 /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		CB5E7C46A82C8FFEBA0EEF17 /* Build configuration list for PBXProject "kakeibo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				856C06630167A086125BD2C6 /* debug */,
+				BCF234FF7ADC6D13E0E8D302 /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = B0019D24E5337F6A97CB2DBB /* Project object */;
+}

@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { transactionOps, categoryOps, getDb } from '../../lib/db'
+import { transactionOps, categoryOps } from '../../lib/db'
 import { seedCategories } from '../../lib/seed'
 import { ConfirmDialog, InlineNotice } from '../ui/Feedback'
 import { Icon } from '../ui/Icon'
+import { domainRepository } from '../../sync/domain-repository'
 
 export function DataManager() {
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -28,8 +29,7 @@ export function DataManager() {
   const handleClear = async () => {
     setClearing(true)
     try {
-      const db = await getDb()
-      await db.clear('transactions')
+      await domainRepository.removeAllTransactions()
       await seedCategories()
       setConfirmOpen(false)
       setCleared(true)
@@ -70,7 +70,7 @@ export function DataManager() {
           setConfirmOpen(true)
         }}
         className="secondary-button"
-        style={{ ...btnBase, background: 'var(--color-danger-soft)', color: 'var(--color-expense-text)' }}
+        style={{ ...btnBase, background: 'var(--color-danger-soft)', color: 'var(--color-danger-text)' }}
       >
         <Icon name="trash" size={18} />
         清除所有账单记录

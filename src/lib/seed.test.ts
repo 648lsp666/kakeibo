@@ -27,4 +27,14 @@ describe('seedCategories', () => {
     expect(canteen?.icon).toBe('food')
     expect(canteen?.isSystem).toBe(true)
   })
+
+  it('includes transfer categories for both expense and income', async () => {
+    await seedCategories()
+    const cats = await categoryOps.list()
+
+    expect(cats).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'sys-transfer-ex', name: '转账支出', icon: 'transfer', type: 'expense' }),
+      expect.objectContaining({ id: 'sys-transfer-in', name: '转账收入', icon: 'transfer', type: 'income' }),
+    ]))
+  })
 })

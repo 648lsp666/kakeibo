@@ -5,6 +5,7 @@ import { Icon, type IconName } from '../ui/Icon'
 const CATEGORY_ICON_OPTIONS = [
   'food', 'cart', 'transit', 'game', 'home', 'medical', 'book', 'category',
   'coffee', 'tea', 'plane', 'gift', 'beauty', 'pet', 'phone', 'fitness', 'music', 'camera',
+  'transfer',
 ] as const satisfies readonly IconName[]
 
 const ICON_LABELS: Record<(typeof CATEGORY_ICON_OPTIONS)[number], string> = {
@@ -26,6 +27,7 @@ const ICON_LABELS: Record<(typeof CATEGORY_ICON_OPTIONS)[number], string> = {
   fitness: '健身',
   music: '音乐',
   camera: '摄影',
+  transfer: '转账',
 }
 
 interface Props {
@@ -149,7 +151,7 @@ export function CategoryForm({ onSave, onCancel, onSavingChange }: Props) {
           boxSizing: 'border-box',
           minHeight: 'var(--tap-size)',
           background: 'var(--color-input-bg)',
-          border: validationError ? '1px solid var(--color-expense)' : '1px solid var(--color-border)',
+          border: validationError ? '1px solid var(--color-danger)' : '1px solid var(--color-border)',
           borderRadius: 12,
           padding: '12px 14px',
           fontSize: 14,
@@ -158,12 +160,12 @@ export function CategoryForm({ onSave, onCancel, onSavingChange }: Props) {
         }}
       />
       {validationError && (
-        <div id="category-name-error" role="alert" style={{ color: 'var(--color-expense-text)', fontSize: 12, fontWeight: 600, marginTop: 7 }}>
+        <div id="category-name-error" role="alert" style={{ color: 'var(--color-danger-text)', fontSize: 12, fontWeight: 600, marginTop: 7 }}>
           {validationError}
         </div>
       )}
       {saveError && (
-        <div role="alert" style={{ color: 'var(--color-expense-text)', fontSize: 12, fontWeight: 600, marginTop: 7 }}>
+        <div role="alert" style={{ color: 'var(--color-danger-text)', fontSize: 12, fontWeight: 600, marginTop: 7 }}>
           {saveError}
         </div>
       )}

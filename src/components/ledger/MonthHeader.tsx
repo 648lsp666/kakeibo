@@ -21,7 +21,6 @@ export function MonthHeader({ yearMonth, summary, importButton, onPrev, onNext, 
     <header className="ledger-hero surface" style={{ borderRadius: 'var(--radius-hero)', padding: 18, margin: 'max(12px, env(safe-area-inset-top)) 16px 0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 18 }}>
         <div>
-          <p style={{ color: 'var(--color-primary-strong)', fontSize: 11, fontWeight: 800, letterSpacing: 1.4, marginBottom: 8 }}>慢慢生活</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <button type="button" aria-label="上个月" onClick={onPrev} style={arrowBtn}><Icon name="chevron-left" size={18} /></button>
             <button type="button" aria-label={`选择月份，当前为${year}年${month}月`} onClick={onPickMonth} style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 999, minHeight: 44, padding: '0 12px', cursor: 'pointer', fontSize: 12, color: 'var(--color-text)', fontWeight: 750, letterSpacing: 0.4 }}>

@@ -13,6 +13,7 @@ const SAMPLE = `微信支付账单明细,,,,,,,,,,
 `
 
 const SAMPLE_WITH_NEUTRAL = SAMPLE + '2026-06-29 10:00:00,/,零钱通,零钱通存入,不计收支,¥100.00,零钱通,已存入零钱通,wx_003,/,/\n'
+const SAMPLE_WITH_SLASH_NEUTRAL = SAMPLE + '2026-06-28 10:00:00,零钱提现,工商银行(7387),/,/,1165.79,工商银行储蓄卡(7387),提现已到账,wx_004,/,/\n'
 
 describe('parseWechatCSV', () => {
   it('parses 2 transactions', () => {
@@ -32,9 +33,14 @@ describe('parseWechatCSV', () => {
     const income = txs.find(t => t.externalId === 'wx_002')!
     expect(income.type).toBe('income')
     expect(income.amount).toBe(5000)
+    expect(income.categoryId).toBe('sys-salary')
   })
 
   it('skips 不计收支 rows', () => {
     expect(parseWechatCSV(SAMPLE_WITH_NEUTRAL)).toHaveLength(2)
+  })
+
+  it('skips current WeChat XLSX neutral rows marked with a slash', () => {
+    expect(parseWechatCSV(SAMPLE_WITH_SLASH_NEUTRAL)).toHaveLength(2)
   })
 })

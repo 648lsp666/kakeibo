@@ -67,9 +67,9 @@ it('uses semantic text tokens for normal, warning, and over-budget copy', () => 
   expect(screen.getByText('80%')).toHaveStyle({ color: 'var(--color-warning-text)' })
 
   rerender(<BudgetCard rs={status({ spending: 120, pct: 1.2, isOver: true, remaining: -20, subLabel: '超支 ¥20.00' })} onEdit={vi.fn()} />)
-  expect(screen.getByText('月预算 · 已超预算')).toHaveStyle({ color: 'var(--color-expense-text)' })
-  expect(screen.getByText('120%')).toHaveStyle({ color: 'var(--color-expense-text)' })
-  expect(screen.getByText('超支 ¥20.00')).toHaveStyle({ color: 'var(--color-expense-text)' })
+  expect(screen.getByText('月预算 · 已超预算')).toHaveStyle({ color: 'var(--color-danger-text)' })
+  expect(screen.getByText('120%')).toHaveStyle({ color: 'var(--color-danger-text)' })
+  expect(screen.getByText('超支 ¥20.00')).toHaveStyle({ color: 'var(--color-danger-text)' })
 })
 
 it('uses the expense text token for the setup delete action', () => {
@@ -83,8 +83,8 @@ it('uses the expense text token for the setup delete action', () => {
   )
 
   const deleteButton = screen.getByRole('button', { name: '删除' })
-  expect(deleteButton).toHaveStyle({ color: 'var(--color-expense-text)' })
-  expect(deleteButton.style.borderColor).toBe('var(--color-expense)')
+  expect(deleteButton).toHaveStyle({ color: 'var(--color-danger-text)' })
+  expect(deleteButton.style.borderColor).toBe('var(--color-danger)')
 })
 
 it('focuses and describes the first invalid budget field', async () => {

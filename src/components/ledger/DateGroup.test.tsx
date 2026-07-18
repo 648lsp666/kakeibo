@@ -24,3 +24,26 @@ it('uses the contrast-safe secondary token for the date heading', () => {
     color: 'var(--color-text-secondary)',
   })
 })
+
+it('does not display an expense category on an income transaction', () => {
+  render(
+    <DateGroup
+      group={{
+        ...group,
+        total: 9.9,
+        transactions: [{
+          id: 'income-1', amount: 9.9, type: 'income', categoryId: 'sys-shop', note: '京东商城平台商户',
+          date: group.date, source: 'wechat', createdAt: '', updatedAt: '',
+        }],
+      }}
+      categories={[
+        { id: 'sys-shop', name: '购物', icon: 'cart', type: 'expense', isSystem: true, sortOrder: 1, createdAt: '' },
+        { id: 'sys-other-in', name: '其他收入', icon: 'gift', type: 'income', isSystem: true, sortOrder: 12, createdAt: '' },
+      ]}
+      onDelete={vi.fn()}
+    />,
+  )
+
+  expect(screen.getByText('其他收入')).toBeInTheDocument()
+  expect(screen.queryByText('购物')).not.toBeInTheDocument()
+})

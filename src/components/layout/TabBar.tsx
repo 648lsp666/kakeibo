@@ -30,6 +30,7 @@ export function TabBar() {
         <button
           key={tab.id}
           type="button"
+          className="tab-button"
           aria-label={tab.label}
           aria-current={activeTab === tab.id ? 'page' : undefined}
           onClick={() => setActiveTab(tab.id)}
@@ -58,6 +59,7 @@ export function TabBar() {
       ))}
       <button
         type="button"
+        className="tab-button"
         aria-label="记一笔"
         onClick={openAddSheet}
         style={{
@@ -81,6 +83,7 @@ export function TabBar() {
         <button
           key={tab.id}
           type="button"
+          className="tab-button"
           aria-label={tab.label}
           aria-current={activeTab === tab.id ? 'page' : undefined}
           onClick={() => setActiveTab(tab.id)}

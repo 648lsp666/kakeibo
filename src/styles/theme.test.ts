@@ -36,6 +36,22 @@ const resolvedToken = (theme: string, name: string): string => {
   return reference ? resolvedToken(theme, reference) : value as string
 }
 
+it('defines the shared restrained-motion vocabulary exactly once', () => {
+  const expected = {
+    'ease-out': 'cubic-bezier(0.23, 1, 0.32, 1)',
+    'ease-in-out': 'cubic-bezier(0.77, 0, 0.175, 1)',
+    'ease-drawer': 'cubic-bezier(0.32, 0.72, 0, 1)',
+    'duration-press': '120ms',
+    'duration-fast': '160ms',
+    'duration-state': '180ms',
+    'duration-expand': '220ms',
+  }
+  for (const [name, value] of Object.entries(expected)) {
+    expect(themeCss.match(new RegExp(`--${name}:\\s*([^;]+);`, 'g'))).toHaveLength(1)
+    expect(resolvedToken(baseTheme, name)).toBe(value)
+  }
+})
+
 it('keeps the small-text token at 4.5:1 against Task 4 surfaces in both themes', () => {
   const themes = [...themeCss.matchAll(/:root\s*\{([^}]*)\}/g)].map((match) => match[1])
   expect(themes).toHaveLength(2)
@@ -55,6 +71,7 @@ it('keeps semantic accent text tokens at 4.5:1 against Task 5 surfaces in both t
   const textTokens = [
     'color-primary-text',
     'color-expense-text',
+    'color-danger-text',
     'color-warning-text',
     'color-income-text',
   ]

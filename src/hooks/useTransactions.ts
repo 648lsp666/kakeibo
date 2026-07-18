@@ -3,6 +3,7 @@ import { transactionOps } from '../lib/db'
 import { useAppStore } from '../store/appStore'
 import type { Transaction, MonthSummary } from '../types'
 import { nanoid } from 'nanoid'
+import { domainRepository } from '../sync/domain-repository'
 
 type NewTransaction = Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>
 
@@ -21,17 +22,17 @@ export function useTransactions(yearMonth: string) {
   const addTransaction = useCallback(async (input: NewTransaction) => {
     const now = new Date().toISOString()
     const tx: Transaction = { ...input, id: nanoid(), createdAt: now, updatedAt: now }
-    await transactionOps.add(tx)
+    await domainRepository.upsert('transaction', tx)
     triggerRefresh()
   }, [triggerRefresh])
 
   const deleteTransaction = useCallback(async (id: string) => {
-    await transactionOps.delete(id)
+    await domainRepository.remove('transaction', id)
     triggerRefresh()
   }, [triggerRefresh])
 
   const importTransactions = useCallback(async (txs: Transaction[]) => {
-    const result = await transactionOps.addMany(txs)
+    const result = await domainRepository.importTransactions(txs)
     triggerRefresh()
     return result
   }, [triggerRefresh])

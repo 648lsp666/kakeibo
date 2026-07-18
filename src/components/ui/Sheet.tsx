@@ -90,6 +90,15 @@ export function Sheet({
     }
   }
 
+  const handleBodyFocus = (event: React.FocusEvent<HTMLDivElement>) => {
+    const target = event.target
+    if (!(target instanceof HTMLElement) || !window.visualViewport) return
+    const viewportBottom = window.visualViewport.offsetTop + window.visualViewport.height
+    if (target.getBoundingClientRect().bottom > viewportBottom) {
+      target.scrollIntoView({ block: 'nearest' })
+    }
+  }
+
   return (
     <AnimatePresence>
       {open && (
@@ -126,25 +135,18 @@ export function Sheet({
               background: 'var(--color-bg-elevated)',
               borderRadius: 'var(--radius-hero) var(--radius-hero) 0 0',
               boxShadow: 'var(--shadow-card)',
+              display: 'flex',
+              flexDirection: 'column',
               margin: '0 auto',
-              maxHeight: '90vh',
+              maxHeight: '90dvh',
               maxWidth: 430,
-              overflowY: 'auto',
-              padding: '10px 20px max(20px, env(safe-area-inset-bottom))',
+              overflow: 'hidden',
               width: '100%',
             }}
           >
-            <div
-              aria-hidden="true"
-              style={{
-                background: 'var(--color-border)',
-                borderRadius: 999,
-                height: 4,
-                margin: '0 auto 10px',
-                width: 40,
-              }}
-            />
-            <header style={{ alignItems: 'flex-start', display: 'flex', gap: 12, marginBottom: 18 }}>
+            <div style={{ flexShrink: 0, padding: '10px 20px 0' }}>
+              <div aria-hidden="true" style={{ background: 'var(--color-border)', borderRadius: 999, height: 4, margin: '0 auto 10px', width: 40 }} />
+            <header style={{ alignItems: 'flex-start', display: 'flex', gap: 12, paddingBottom: 18 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h2 id={titleId} style={{ color: 'var(--color-text)', fontSize: 18, fontWeight: 800 }}>
                   {title}
@@ -162,8 +164,9 @@ export function Sheet({
                 <Icon name="close" />
               </button>
             </header>
-            <div>{children}</div>
-            {footer && <footer style={{ marginTop: 20 }}>{footer}</footer>}
+            </div>
+            <div data-sheet-body onFocus={handleBodyFocus} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '0 20px 20px', WebkitOverflowScrolling: 'touch' }}>{children}</div>
+            {footer && <footer data-sheet-footer style={{ background: 'var(--color-bg-elevated)', borderTop: '1px solid var(--color-border)', flexShrink: 0, padding: '16px 20px max(16px, env(safe-area-inset-bottom))' }}>{footer}</footer>}
           </motion.section>
         </motion.div>
       )}
