@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(20);
+select plan(28);
 
 set local request.jwt.claim.sub = '';
 set local role postgres;
@@ -135,6 +135,84 @@ select is(
     where payload->>'externalId' = 'shared-external-id'),
   1::bigint,
   'external-ID deduplication creates no second row'
+);
+
+select ok(
+  public.enable_bill_inbox(false) ~ '^[0-9a-f]{20}$',
+  'an authenticated user receives an unguessable inbox alias'
+);
+
+select is(
+  public.enable_bill_inbox(false),
+  (select alias from public.bill_inboxes where user_id = auth.uid()),
+  'enabling an existing inbox reuses its alias'
+);
+
+set local role postgres;
+update public.bill_inboxes
+   set alias = 'ffffffffffffffffffff'
+ where user_id = '11111111-1111-1111-1111-111111111111';
+set local role authenticated;
+
+select isnt(
+  public.enable_bill_inbox(true),
+  'ffffffffffffffffffff',
+  'resetting an inbox invalidates its previous alias'
+);
+
+select is(
+  (select count(*) from public.bill_inboxes),
+  1::bigint,
+  'a user can read only their own inbox row'
+);
+
+select throws_ok(
+  $$ insert into public.pending_bills (
+       id, user_id, resend_email_id, filename, status, received_at, expires_at
+     ) values (
+       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', auth.uid(), 'direct-email',
+       'bill.zip', 'pending', now(), now() + interval '7 days'
+     ) $$,
+  '42501', 'permission denied for table pending_bills',
+  'clients cannot directly create pending bill rows'
+);
+
+set local role postgres;
+insert into public.bill_inboxes (user_id, alias)
+values ('22222222-2222-2222-2222-222222222222', '22222222222222222222');
+insert into public.pending_bills (
+  id, user_id, resend_email_id, attachment_id, filename, content_type, size_bytes,
+  storage_path, content_sha256, status, received_at, expires_at
+) values
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111',
+   'email-own', 'attachment-own', 'wechat.zip', 'application/zip', 1024,
+   '11111111-1111-1111-1111-111111111111/own/wechat.zip', repeat('a', 64),
+   'pending', now(), now() + interval '7 days'),
+  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222',
+   'email-other', 'attachment-other', 'alipay.zip', 'application/zip', 2048,
+   '22222222-2222-2222-2222-222222222222/other/alipay.zip', repeat('b', 64),
+   'pending', now(), now() + interval '7 days');
+set local role authenticated;
+
+select is(
+  (select count(*) from public.bill_inboxes where user_id = '22222222-2222-2222-2222-222222222222'),
+  0::bigint,
+  'inbox rows are isolated by user'
+);
+
+select is(
+  (select count(*) from public.pending_bills),
+  1::bigint,
+  'pending bill rows are isolated by user'
+);
+
+select throws_ok(
+  $$ update public.pending_bills
+        set status = 'completed', storage_path = null, source = 'wechat',
+            statement_period = '2026-06', imported_count = 12, completed_at = now()
+      where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' $$,
+  '42501', 'permission denied for table pending_bills',
+  'clients cannot bypass the attachment-cleanup Edge Function'
 );
 
 select * from finish();

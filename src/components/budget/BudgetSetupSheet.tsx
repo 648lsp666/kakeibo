@@ -75,7 +75,7 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
               disabled={saving}
               onClick={onDelete}
               className="secondary-button"
-              style={{ borderColor: 'var(--color-expense)', color: 'var(--color-expense-text)', flexShrink: 0 }}
+              style={{ borderColor: 'var(--color-danger)', color: 'var(--color-danger-text)', flexShrink: 0 }}
             >
               删除
             </button>

@@ -55,6 +55,41 @@ button {
 }
 
 .primary-button,
+.secondary-button,
+.icon-button,
+.tab-button,
+.calendar-day,
+.pressable-control {
+  touch-action: manipulation;
+  transition: transform var(--duration-press) var(--ease-out);
+}
+
+.primary-button:not(:disabled):active,
+.secondary-button:not(:disabled):active,
+.icon-button:not(:disabled):active,
+.tab-button:not(:disabled):active,
+.calendar-day:not(:disabled):active,
+.pressable-control:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+.stats-period-panel {
+  min-width: 0;
+}
+
+.motion-chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  transition: transform var(--duration-expand) var(--ease-drawer);
+}
+
+.motion-chevron[data-expanded="true"] { transform: rotate(90deg); }
+
+.motion-status {
+  transition: opacity var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
+}
+
+.primary-button,
 .secondary-button {
   align-items: center;
   border-radius: var(--radius-control);
@@ -93,6 +128,22 @@ button {
   -webkit-overflow-scrolling: touch;
 }
 
+.stats-page {
+  padding-left: max(12px, env(safe-area-inset-left));
+  padding-right: max(12px, env(safe-area-inset-right));
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+
+@media (max-width: 359px) {
+  .page-scroll {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .stats-page { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+  .calendar-grid, .calendar-week-grid { gap: 2px !important; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -100,6 +151,28 @@ button {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
+  }
+
+  .motion-enter,
+  .motion-status,
+  .motion-chevron {
+    transform: none !important;
+    transition-duration: 160ms !important;
+    transition-property: opacity, color, background-color !important;
+  }
+
+  .primary-button,
+  .secondary-button,
+  .icon-button,
+  .tab-button,
+  .calendar-day,
+  .pressable-control,
+  .primary-button:not(:disabled):active,
+  .secondary-button:not(:disabled):active,
+  .icon-button:not(:disabled):active,
+  .tab-button:not(:disabled):active,
+  .calendar-day:not(:disabled):active,
+  .pressable-control:not(:disabled):active {
+    transform: none !important;
   }
 }

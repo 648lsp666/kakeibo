@@ -6,6 +6,7 @@ export const ICON_NAMES = [
   'check', 'info', 'calendar', 'target', 'wallet', 'food', 'cart', 'transit',
   'game', 'home', 'medical', 'book', 'briefcase', 'coins', 'gift', 'coffee',
   'tea', 'plane', 'beauty', 'pet', 'phone', 'fitness', 'music', 'camera', 'more',
+  'mail', 'refresh', 'chevron-down', 'transfer',
 ] as const
 
 export type IconName = (typeof ICON_NAMES)[number]
@@ -21,9 +22,10 @@ const paths: Record<IconName, React.ReactNode> = {
   ledger: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 5.5v16M8 7h7M8 11h5"/></>,
   chart: <><path d="M5 19v-7M12 19V5M19 19v-4"/><path d="M3 19h18"/></>,
   category: <><path d="m20 13-7 7-9-9V4h7z"/><circle cx="8" cy="8" r="1"/></>,
-  settings: <><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.7-.7-1.7.9-1.9-2.4-2.4-1.9.9-1.7-.7-.7-2h-3l-.7 2-1.7.7-1.9-.9-2.4 2.4.9 1.9-.7 1.7-2 .7v3l2 .7.7 1.7-.9 1.9 2.4 2.4 1.9-.9 1.7.7.7 2h3l.7-2 1.7-.7 1.9.9 2.4-2.4-.9-1.9.7-1.7z"/></>,
+  settings: <><circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/></>,
   plus: <path d="M12 5v14M5 12h14"/>, close: <path d="m6 6 12 12M18 6 6 18"/>,
   'chevron-left': <path d="m15 18-6-6 6-6"/>, 'chevron-right': <path d="m9 18 6-6-6-6"/>,
+  'chevron-down': <path d="m6 9 6 6 6-6"/>,
   download: <><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 20h14"/></>,
   upload: <><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/></>,
   cloud: <path d="M7 18h11a4 4 0 0 0 .5-8A6 6 0 0 0 7 8.5 4.5 4.5 0 0 0 7 18z"/>,
@@ -53,6 +55,9 @@ const paths: Record<IconName, React.ReactNode> = {
   music: <><path d="M9 18V5l10-2v13M9 8l10-2"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></>,
   camera: <><path d="M4 7h4l2-3h4l2 3h4v13H4z"/><circle cx="12" cy="13" r="4"/></>,
   more: <><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,
+  mail: <><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></>,
+  refresh: <><path d="M20 11a8 8 0 0 0-14.8-4M4 4v5h5"/><path d="M4 13a8 8 0 0 0 14.8 4M20 20v-5h-5"/></>,
+  transfer: <><path d="M4 8h15M15 4l4 4-4 4"/><path d="M20 16H5M9 12l-4 4 4 4"/></>,
 }
 
 export function Icon({ name, size = 20, label, className }: {

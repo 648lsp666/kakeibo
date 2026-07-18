@@ -9,6 +9,11 @@ interface Props {
 
 export function DateGroup({ group, categories, onDelete }: Props) {
   const catMap = Object.fromEntries(categories.map(c => [c.id, c]))
+  const categoryFor = (tx: DailyGroup['transactions'][number]) => {
+    const assigned = catMap[tx.categoryId]
+    if (assigned?.type === tx.type) return assigned
+    return catMap[tx.type === 'income' ? 'sys-other-in' : 'sys-other-ex']
+  }
   const isNeg = group.total < 0
   const dateObj = new Date(group.date + 'T00:00:00')
   const label = dateObj.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' })
@@ -23,7 +28,7 @@ export function DateGroup({ group, categories, onDelete }: Props) {
       </header>
       <ul style={{ listStyle: 'none', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--shadow-card)' }}>
         {group.transactions.map(tx => (
-          <TransactionItem key={tx.id} tx={tx} category={catMap[tx.categoryId]} onDelete={onDelete} />
+          <TransactionItem key={tx.id} tx={tx} category={categoryFor(tx)} onDelete={onDelete} />
         ))}
       </ul>
     </section>

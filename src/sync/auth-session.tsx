@@ -23,6 +23,7 @@ export interface AuthSyncContextValue {
   isolated: number
   isolatedReason?: string
   sendOtp(email: string): Promise<void>
+  verifyOtp(email: string, token: string): Promise<void>
   confirmMigration(): Promise<void>
   skipMigration(): Promise<void>
   prepareSignOut(): Promise<number>
@@ -365,10 +366,14 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
   const sendOtp = useCallback(async (email: string) => {
     const client = clientRef.current
     if (!client) throw new Error('云同步尚未配置')
-    const { error } = await client.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin },
-    })
+    const { error } = await client.auth.signInWithOtp({ email })
+    if (error) throw error
+  }, [])
+
+  const verifyOtp = useCallback(async (email: string, token: string) => {
+    const client = clientRef.current
+    if (!client) throw new Error('云同步尚未配置')
+    const { error } = await client.auth.verifyOtp({ email, token, type: 'email' })
     if (error) throw error
   }, [])
 
@@ -475,13 +480,14 @@ export function AuthSyncProvider({ children }: { children: React.ReactNode }) {
     isolated,
     isolatedReason,
     sendOtp,
+    verifyOtp,
     confirmMigration,
     skipMigration,
     prepareSignOut,
     signOut,
     retry,
     retryIsolated,
-  }), [confirmMigration, isolated, isolatedReason, loading, migrationRequired, prepareSignOut, retry, retryIsolated, sendOtp, session, signOut, skipMigration, syncStatus])
+  }), [confirmMigration, isolated, isolatedReason, loading, migrationRequired, prepareSignOut, retry, retryIsolated, sendOtp, session, signOut, skipMigration, syncStatus, verifyOtp])
 
   return <AuthSyncContext.Provider value={value}>{children}</AuthSyncContext.Provider>
 }

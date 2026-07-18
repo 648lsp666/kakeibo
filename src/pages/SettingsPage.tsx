@@ -1,6 +1,7 @@
 import { WebDAVConfig } from '../components/settings/WebDAVConfig'
 import { DataManager } from '../components/settings/DataManager'
 import { CloudSyncCard } from '../components/settings/CloudSyncCard'
+import { BillInboxConfig } from '../components/settings/BillInboxConfig'
 
 export function SettingsPage() {
   return (
@@ -14,6 +15,7 @@ export function SettingsPage() {
       <section aria-labelledby="sync-settings-title">
         <h2 id="sync-settings-title" style={sectionTitle}>同步与备份</h2>
         <CloudSyncCard />
+        <BillInboxConfig />
         <div className="surface" style={{ marginTop: 14, padding: 16 }}>
           <WebDAVConfig />
         </div>

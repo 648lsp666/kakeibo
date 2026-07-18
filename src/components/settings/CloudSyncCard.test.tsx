@@ -19,6 +19,7 @@ function auth(overrides: Record<string, unknown> = {}) {
     pending: 0,
     isolated: 0,
     sendOtp: vi.fn().mockResolvedValue(undefined),
+    verifyOtp: vi.fn().mockResolvedValue(undefined),
     confirmMigration: vi.fn().mockResolvedValue(undefined),
     skipMigration: vi.fn().mockResolvedValue(undefined),
     signOut: vi.fn().mockResolvedValue(undefined),
@@ -35,15 +36,28 @@ describe('CloudSyncCard', () => {
     mocks.status = { kind: 'local-only' }
   })
 
-  it('sends an email magic link and explains foreground automatic sync', async () => {
+  it('sends and verifies an email code inside the app', async () => {
     render(<CloudSyncCard />)
 
     expect(screen.getByText(/应用打开时自动同步/)).toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('邮箱地址'), 'reader@example.com')
-    await userEvent.click(screen.getByRole('button', { name: '发送登录链接' }))
+    await userEvent.click(screen.getByRole('button', { name: '发送验证码' }))
 
     expect(mocks.auth.sendOtp).toHaveBeenCalledWith('reader@example.com')
-    expect(await screen.findByRole('status')).toHaveTextContent('登录链接已发送')
+    expect(await screen.findByRole('status')).toHaveTextContent('验证码已发送')
+    await userEvent.type(screen.getByLabelText('邮箱验证码'), '123456')
+    await userEvent.click(screen.getByRole('button', { name: '验证并登录' }))
+    expect(mocks.auth.verifyOtp).toHaveBeenCalledWith('reader@example.com', '123456')
+  })
+
+  it('accepts the eight-digit OTP configured by Supabase', async () => {
+    render(<CloudSyncCard />)
+    await userEvent.type(screen.getByLabelText('邮箱地址'), 'reader@example.com')
+    await userEvent.click(screen.getByRole('button', { name: '发送验证码' }))
+    await userEvent.type(screen.getByLabelText('邮箱验证码'), '12345678')
+    await userEvent.click(screen.getByRole('button', { name: '验证并登录' }))
+
+    expect(mocks.auth.verifyOtp).toHaveBeenCalledWith('reader@example.com', '12345678')
   })
 
   it('shows the signed-in account, status, pending count, retry, and sign-out', async () => {
@@ -134,10 +148,36 @@ describe('CloudSyncCard', () => {
     mocks.auth = auth({ sendOtp: vi.fn().mockRejectedValue(new Error('发送失败')) })
     render(<CloudSyncCard />)
     await userEvent.type(screen.getByLabelText('邮箱地址'), 'reader@example.com')
-    await userEvent.click(screen.getByRole('button', { name: '发送登录链接' }))
+    await userEvent.click(screen.getByRole('button', { name: '发送验证码' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('发送失败')
-    expect(screen.getByRole('button', { name: '发送登录链接' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '发送验证码' })).toBeEnabled()
+  })
+
+  it('replaces opaque Supabase retry errors with an actionable email-service message', async () => {
+    const retryableError = Object.assign(new Error('{}'), { name: 'AuthRetryableFetchError' })
+    mocks.auth = auth({ sendOtp: vi.fn().mockRejectedValue(retryableError) })
+    render(<CloudSyncCard />)
+    await userEvent.type(screen.getByLabelText('邮箱地址'), 'reader@example.com')
+    await userEvent.click(screen.getByRole('button', { name: '发送验证码' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('验证码邮件发送失败，请检查发件域名或 SMTP 配置后重试')
+    expect(alert).not.toHaveTextContent('{}')
+    expect(screen.getByRole('button', { name: '发送验证码' })).toBeEnabled()
+  })
+
+  it('keeps the code form available after an invalid verification code', async () => {
+    mocks.auth = auth({ verifyOtp: vi.fn().mockRejectedValue(new Error('验证码无效或已过期')) })
+    render(<CloudSyncCard />)
+    await userEvent.type(screen.getByLabelText('邮箱地址'), 'reader@example.com')
+    await userEvent.click(screen.getByRole('button', { name: '发送验证码' }))
+    await userEvent.type(screen.getByLabelText('邮箱验证码'), '123456')
+    await userEvent.click(screen.getByRole('button', { name: '验证并登录' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('验证码无效或已过期')
+    expect(screen.getByLabelText('邮箱验证码')).toHaveValue('123456')
+    expect(screen.getByRole('button', { name: '验证并登录' })).toBeEnabled()
   })
 
   it('shows isolated changes with their reason and retries just those changes', async () => {

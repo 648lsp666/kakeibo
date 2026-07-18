@@ -8,7 +8,7 @@ import { AddSheet } from './components/entry/AddSheet'
 import './index.css'
 import { AuthSyncProvider, useAuthSync } from './sync/auth-session'
 import { CloudSyncCard } from './components/settings/CloudSyncCard'
-import { SyncStatusPill } from './components/sync/SyncStatusPill'
+import { motion } from 'framer-motion'
 
 export default function App() {
   return (
@@ -21,6 +21,10 @@ export default function App() {
 function AppContent() {
   const { activeTab } = useAppStore()
   const auth = useAuthSync()
+  const activePage = activeTab === 'ledger' ? <LedgerPage />
+    : activeTab === 'stats' ? <StatsPage />
+      : activeTab === 'category' ? <CategoryPage />
+        : <SettingsPage />
 
   if (auth.loading || auth.migrationRequired) {
     return (
@@ -45,12 +49,16 @@ function AppContent() {
 
   return (
     <div className="app-shell" style={shellStyle}>
-      <SyncStatusPill />
       <main style={{ flex: 1, minHeight: 0, overflow: 'hidden', paddingBottom: 'calc(90px + env(safe-area-inset-bottom))' }}>
-        {activeTab === 'ledger'   && <LedgerPage />}
-        {activeTab === 'stats'    && <StatsPage />}
-        {activeTab === 'category' && <CategoryPage />}
-        {activeTab === 'settings' && <SettingsPage />}
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.14, ease: [0.23, 1, 0.32, 1] }}
+          style={{ height: '100%', minHeight: 0 }}
+        >
+          {activePage}
+        </motion.div>
       </main>
       <TabBar />
       <AddSheet />

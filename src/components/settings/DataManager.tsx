@@ -70,7 +70,7 @@ export function DataManager() {
           setConfirmOpen(true)
         }}
         className="secondary-button"
-        style={{ ...btnBase, background: 'var(--color-danger-soft)', color: 'var(--color-expense-text)' }}
+        style={{ ...btnBase, background: 'var(--color-danger-soft)', color: 'var(--color-danger-text)' }}
       >
         <Icon name="trash" size={18} />
         清除所有账单记录

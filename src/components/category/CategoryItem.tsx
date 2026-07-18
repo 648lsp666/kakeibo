@@ -44,7 +44,7 @@ export function CategoryItem({ category, onDelete }: Props) {
           className="icon-button"
           aria-label={`删除${category.name}`}
           onClick={() => onDelete(category)}
-          style={{ color: 'var(--color-expense-text)', flexShrink: 0 }}
+          style={{ color: 'var(--color-danger-text)', flexShrink: 0 }}
         >
           <Icon name="trash" size={18} />
         </button>

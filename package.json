@@ -7,13 +7,18 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build:mac": "tauri build --bundles app,dmg",
+    "tauri:android:dev": "tauri android dev",
+    "tauri:android:build": "tauri android build --apk --aab"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.5",
     "@tailwindcss/vite": "^4.3.2",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "@zip.js/zip.js": "^2.8.31",
     "framer-motion": "^12.42.1",
     "idb": "^8.0.3",
     "nanoid": "^5.1.16",

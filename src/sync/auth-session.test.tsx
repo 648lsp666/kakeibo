@@ -77,6 +77,7 @@ function createAuthClient(restored: Session | null | Promise<{ data: { session: 
       return { data: { subscription: { unsubscribe: () => listeners.delete(callback) } } }
     }),
     signInWithOtp: vi.fn().mockResolvedValue({ error: null }),
+    verifyOtp: vi.fn().mockResolvedValue({ error: null }),
     signOut: vi.fn().mockImplementation(async () => {
       for (const listener of listeners) listener('SIGNED_OUT', null)
       return { error: null }
@@ -99,6 +100,7 @@ function Harness() {
       <span data-testid="migration">{String(auth.migrationRequired)}</span>
       <span data-testid="isolated">{String(auth.isolated)}</span>
       <button onClick={() => void auth.sendOtp('reader@example.com')}>otp</button>
+      <button onClick={() => void auth.verifyOtp('reader@example.com', '123456')}>verify-otp</button>
       <button onClick={() => void auth.confirmMigration()}>confirm</button>
       <button onClick={() => void auth.skipMigration()}>skip</button>
       <button onClick={() => void auth.prepareSignOut()}>prepare-sign-out</button>
@@ -183,14 +185,17 @@ describe('AuthSyncProvider', () => {
     expect(start).toHaveBeenCalledWith(true)
   })
 
-  it('uses a magic-link OTP redirect to the current web origin', async () => {
+  it('sends and verifies an email code without a browser redirect', async () => {
     const client = createAuthClient(null)
     mocks.getClient.mockReturnValue(client as any)
     render(<AuthSyncProvider><Harness /></AuthSyncProvider>)
     await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
     await userEvent.click(screen.getByRole('button', { name: 'otp' }))
-    expect(client.auth.signInWithOtp).toHaveBeenCalledWith({
-      email: 'reader@example.com', options: { emailRedirectTo: window.location.origin },
+    expect(client.auth.signInWithOtp).toHaveBeenCalledWith({ email: 'reader@example.com' })
+
+    await userEvent.click(screen.getByRole('button', { name: 'verify-otp' }))
+    expect(client.auth.verifyOtp).toHaveBeenCalledWith({
+      email: 'reader@example.com', token: '123456', type: 'email',
     })
   })
 

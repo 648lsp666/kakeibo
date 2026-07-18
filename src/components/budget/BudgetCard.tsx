@@ -13,8 +13,8 @@ export function BudgetCard({ rs, onEdit }: Props) {
   const { label, spending, limit, pct, isOver, subLabel } = rs
   const pctClamped = Math.min(pct, 1)
   const isWarning = !isOver && pct >= 0.8
-  const barColor = isOver ? 'var(--color-expense)' : isWarning ? 'var(--color-warning)' : 'var(--color-primary)'
-  const textColor = isOver ? 'var(--color-expense-text)' : isWarning ? 'var(--color-warning-text)' : 'var(--color-primary-text)'
+  const barColor = isOver ? 'var(--color-danger)' : isWarning ? 'var(--color-warning)' : 'var(--color-primary)'
+  const textColor = isOver ? 'var(--color-danger-text)' : isWarning ? 'var(--color-warning-text)' : 'var(--color-primary-text)'
   const statusLabel = isOver ? '已超预算' : isWarning ? '接近预算' : '预算正常'
 
   return (
@@ -40,7 +40,7 @@ export function BudgetCard({ rs, onEdit }: Props) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 8 }}>
-        <span style={{ fontSize: 18, fontWeight: 900, color: isOver ? 'var(--color-expense-text)' : 'var(--color-text)' }}>
+        <span style={{ fontSize: 18, fontWeight: 900, color: isOver ? 'var(--color-danger-text)' : 'var(--color-text)' }}>
           ¥{fmt(spending)}
         </span>
         <span style={{ fontSize: 12, color: 'var(--color-text-small)' }}>/ ¥{fmt(limit)}</span>

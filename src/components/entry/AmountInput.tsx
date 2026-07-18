@@ -63,6 +63,7 @@ export const AmountInput = forwardRef<HTMLDivElement, Props>(function AmountInpu
                 justifyContent: 'center',
                 minHeight: 44,
                 padding: '8px 0',
+                touchAction: 'manipulation',
               }}
             >
               {isDelete ? (

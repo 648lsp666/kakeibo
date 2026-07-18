@@ -17,9 +17,10 @@ const transaction: Transaction = {
   updatedAt: '2026-07-15T12:00:00.000Z',
 }
 
-const { importTransactions, getAll } = vi.hoisted(() => ({
+const { importTransactions, getAll, completePending } = vi.hoisted(() => ({
   importTransactions: vi.fn(),
   getAll: vi.fn(),
+  completePending: vi.fn(),
 }))
 
 vi.mock('../hooks/useTransactions', () => ({
@@ -38,10 +39,20 @@ vi.mock('../components/import/CSVImportButton', () => ({
     <button type="button" onClick={() => onParsed([transaction], 'wechat')}>选择测试账单</button>
   ),
 }))
+vi.mock('../components/import/PendingBillsCard', () => ({
+  PendingBillsCard: ({ onParsed }: { onParsed: (...args: any[]) => void }) => (
+    <button type="button" onClick={() => onParsed(
+      { source: 'wechat', transactions: [transaction] },
+      { id: 'pending-bill-1', filename: 'wechat.zip' },
+      completePending,
+    )}>选择邮件测试账单</button>
+  ),
+}))
 
 beforeEach(() => {
   importTransactions.mockReset()
   getAll.mockReset().mockResolvedValue([])
+  completePending.mockReset().mockResolvedValue(undefined)
   useAppStore.setState({ currentMonth: '2026-07' })
 })
 
@@ -68,4 +79,43 @@ it('clears the preview only after a successful import', async () => {
 
   expect(await screen.findByRole('status')).toHaveTextContent('导入完成：新增 1 条，跳过重复 0 条')
   await waitFor(() => expect(screen.queryByRole('dialog', { name: '微信账单预览' })).not.toBeInTheDocument())
+})
+
+it('completes and deletes a pending attachment only after its transactions import', async () => {
+  importTransactions.mockResolvedValueOnce({ added: 1, skipped: 0 })
+  const user = userEvent.setup()
+  render(<LedgerPage />)
+
+  await user.click(screen.getByRole('button', { name: '选择邮件测试账单' }))
+  await user.click(await screen.findByRole('button', { name: '确认导入 1 条' }))
+
+  await waitFor(() => expect(completePending).toHaveBeenCalledWith({
+    source: 'wechat', statementPeriod: '2026-07', importedCount: 1,
+  }))
+  expect(importTransactions.mock.invocationCallOrder[0]).toBeLessThan(completePending.mock.invocationCallOrder[0])
+})
+
+it('keeps the pending attachment when transaction import fails', async () => {
+  importTransactions.mockRejectedValueOnce(new Error('database unavailable'))
+  const user = userEvent.setup()
+  render(<LedgerPage />)
+
+  await user.click(screen.getByRole('button', { name: '选择邮件测试账单' }))
+  await user.click(await screen.findByRole('button', { name: '确认导入 1 条' }))
+
+  await screen.findByText('导入失败：database unavailable')
+  expect(completePending).not.toHaveBeenCalled()
+})
+
+it('keeps the preview retryable when attachment cleanup fails after import', async () => {
+  importTransactions.mockResolvedValueOnce({ added: 1, skipped: 0 })
+  completePending.mockRejectedValueOnce(new Error('cleanup unavailable'))
+  const user = userEvent.setup()
+  render(<LedgerPage />)
+
+  await user.click(screen.getByRole('button', { name: '选择邮件测试账单' }))
+  await user.click(await screen.findByRole('button', { name: '确认导入 1 条' }))
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('导入失败：cleanup unavailable')
+  expect(screen.getByRole('dialog', { name: '微信账单预览' })).toBeInTheDocument()
 })

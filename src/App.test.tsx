@@ -26,6 +26,7 @@ vi.mock('./pages/SettingsPage', () => ({ SettingsPage: () => <div>设置工作�
 vi.mock('./components/layout/TabBar', () => ({ TabBar: () => <div>导航栏</div> }))
 vi.mock('./components/entry/AddSheet', () => ({ AddSheet: () => <div>新增账单</div> }))
 vi.mock('./components/settings/CloudSyncCard', () => ({ CloudSyncCard: () => <div>迁移账号卡片</div> }))
+vi.mock('./components/sync/SyncStatusPill', () => ({ SyncStatusPill: () => <div>全局同步提示</div> }))
 
 beforeEach(() => {
   mocks.auth = { loading: true, migrationRequired: false }
@@ -60,4 +61,12 @@ it('unmounts workspace UI during migration and exposes only the explicit migrati
   expect(screen.queryByText('新增账单')).not.toBeInTheDocument()
   expect(screen.getByText('迁移账号卡片')).toBeInTheDocument()
   expect(mocks.unmounts).toBe(1)
+})
+
+it('does not mount a global sync status overlay in the workspace', () => {
+  mocks.auth = { loading: false, migrationRequired: false }
+
+  render(<App />)
+
+  expect(screen.queryByText('全局同步提示')).not.toBeInTheDocument()
 })

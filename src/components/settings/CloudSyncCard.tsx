@@ -7,7 +7,12 @@ import { Icon } from '../ui/Icon'
 import { Sheet } from '../ui/Sheet'
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : '操作失败，请重试'
+  if (!(error instanceof Error)) return '操作失败，请重试'
+  const detail = error.message.trim()
+  if (error.name === 'AuthRetryableFetchError' || !detail || detail === '{}') {
+    return '验证码邮件发送失败，请检查发件域名或 SMTP 配置后重试'
+  }
+  return detail
 }
 
 function statusText(status: SyncStatus, pending: number): string {
@@ -25,6 +30,8 @@ export function CloudSyncCard() {
   const auth = useAuthSync()
   const status = useSyncStore(state => state.status)
   const [email, setEmail] = useState('')
+  const [otp, setOtp] = useState('')
+  const [awaitingOtp, setAwaitingOtp] = useState(false)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const [signOutOpen, setSignOutOpen] = useState(false)
@@ -46,7 +53,15 @@ export function CloudSyncCard() {
     event.preventDefault()
     await run(async () => {
       await auth.sendOtp(email.trim())
-      setNotice({ tone: 'success', text: '登录链接已发送，请检查邮箱' })
+      setAwaitingOtp(true)
+      setNotice({ tone: 'success', text: '验证码已发送，请检查邮箱' })
+    })
+  }
+
+  const verifyOtp = async (event: React.FormEvent) => {
+    event.preventDefault()
+    await run(async () => {
+      await auth.verifyOtp(email.trim(), otp.trim())
     })
   }
 
@@ -79,7 +94,7 @@ export function CloudSyncCard() {
       </div>
 
       {!auth.session ? (
-        <form onSubmit={sendOtp} style={{ display: 'grid', gap: 10, marginTop: 14 }}>
+        <form onSubmit={awaitingOtp ? verifyOtp : sendOtp} style={{ display: 'grid', gap: 10, marginTop: 14 }}>
           <label htmlFor="cloud-sync-email" style={{ color: 'var(--color-text-small)', fontSize: 12, fontWeight: 700 }}>
             邮箱地址
           </label>
@@ -88,6 +103,7 @@ export function CloudSyncCard() {
             type="email"
             autoComplete="email"
             required
+            disabled={awaitingOtp}
             value={email}
             onChange={event => setEmail(event.target.value)}
             placeholder="you@example.com"
@@ -102,9 +118,51 @@ export function CloudSyncCard() {
               width: '100%',
             }}
           />
+          {awaitingOtp && (
+            <>
+              <label htmlFor="cloud-sync-otp" style={{ color: 'var(--color-text-small)', fontSize: 12, fontWeight: 700 }}>
+                邮箱验证码
+              </label>
+              <input
+                id="cloud-sync-otp"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6,8}"
+                maxLength={8}
+                required
+                autoFocus
+                value={otp}
+                onChange={event => setOtp(event.target.value.replace(/\D/g, '').slice(0, 8))}
+                placeholder="6–8 位验证码"
+                style={{
+                  background: 'var(--color-input-bg)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-control)',
+                  color: 'var(--color-text)',
+                  fontSize: 18,
+                  letterSpacing: '0.24em',
+                  minHeight: 'var(--tap-size)',
+                  padding: '0 14px',
+                  textAlign: 'center',
+                  width: '100%',
+                }}
+              />
+            </>
+          )}
           <button type="submit" className="primary-button" disabled={busy || auth.loading}>
-            {busy ? '发送中…' : '发送登录链接'}
+            {busy ? (awaitingOtp ? '验证中…' : '发送中…') : (awaitingOtp ? '验证并登录' : '发送验证码')}
           </button>
+          {awaitingOtp && (
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={busy || auth.loading}
+              onClick={() => { setAwaitingOtp(false); setOtp(''); setNotice(null) }}
+            >
+              更换邮箱
+            </button>
+          )}
         </form>
       ) : (
         <div style={{ marginTop: 14 }}>

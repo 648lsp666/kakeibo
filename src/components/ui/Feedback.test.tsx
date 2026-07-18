@@ -8,6 +8,11 @@ it('exposes semantic status text', () => {
   expect(screen.getByRole('alert')).toHaveTextContent('连接失败')
 })
 
+it('keeps non-error notices as polite status regions', () => {
+  render(<InlineNotice tone="success">保存成功</InlineNotice>)
+  expect(screen.getByRole('status')).toHaveTextContent('保存成功')
+})
+
 it('renders an empty state action', async () => {
   const onAction = vi.fn()
   render(<EmptyState icon="ledger" title="本月暂无记录" actionLabel="记一笔" onAction={onAction} />)

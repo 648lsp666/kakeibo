@@ -16,8 +16,8 @@ function parseCSVLine(line: string): string[] {
 }
 
 function buildTransaction(cols: string[]): Transaction | null {
-  const [dateTime, , counterparty, goods, direction, amountStr, , , txNo] = cols
-  if (!dateTime || direction === '不计收支') return null
+  const [dateTime, transactionKind, counterparty, goods, direction, amountStr, , , txNo] = cols
+  if (!dateTime || !['收入', '支出'].includes(direction)) return null
 
   const amount = Math.round(parseFloat(String(amountStr).replace('¥', '').replace(',', '')) * 100) / 100
   if (isNaN(amount) || amount <= 0) return null
@@ -31,7 +31,7 @@ function buildTransaction(cols: string[]): Transaction | null {
     id: nanoid(),
     amount,
     type,
-    categoryId: guessCategory(merchant),
+    categoryId: guessCategory(merchant, type, `${transactionKind} ${goods}`),
     note: (goods !== '/' ? goods : counterparty) || '',
     date,
     source: 'wechat',

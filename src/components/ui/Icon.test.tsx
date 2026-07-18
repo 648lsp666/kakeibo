@@ -19,6 +19,11 @@ describe('Icon', () => {
     expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
   })
 
+  it('renders the transfer category icon', () => {
+    render(<Icon name="transfer" label="转账" />)
+    expect(screen.getByRole('img', { name: '转账' })).toBeInTheDocument()
+  })
+
   it('prefers a stable icon name, maps legacy emoji, and falls back', () => {
     expect(categoryIconName(category({ icon: 'coffee', emoji: '🍜' }))).toBe('coffee')
     expect(categoryIconName(category({ emoji: '🍜' }))).toBe('food')

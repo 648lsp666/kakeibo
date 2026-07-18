@@ -1,12 +1,13 @@
 import { Icon, type IconName } from './Icon'
 import { Sheet } from './Sheet'
+import { motion, useReducedMotion } from 'framer-motion'
 
 export type NoticeTone = 'success' | 'warning' | 'error' | 'info'
 
 const noticeStyles: Record<NoticeTone, { background: string; color: string; icon: IconName }> = {
   success: { background: 'var(--color-primary-soft)', color: 'var(--color-income)', icon: 'check' },
   warning: { background: 'var(--color-bg-secondary)', color: 'var(--color-warning)', icon: 'warning' },
-  error: { background: 'var(--color-danger-soft)', color: 'var(--color-expense)', icon: 'warning' },
+  error: { background: 'var(--color-danger-soft)', color: 'var(--color-danger)', icon: 'warning' },
   info: { background: 'var(--color-bg-secondary)', color: 'var(--color-primary-strong)', icon: 'info' },
 }
 
@@ -18,10 +19,16 @@ export function InlineNotice({
   children: React.ReactNode
 }): React.ReactNode {
   const style = noticeStyles[tone]
+  const shouldReduceMotion = useReducedMotion()
 
   return (
-    <div
+    <motion.div
+      className="inline-notice motion-enter"
       role={tone === 'error' ? 'alert' : 'status'}
+      initial={{ opacity: 0, transform: shouldReduceMotion ? 'translateY(0)' : 'translateY(-4px)' }}
+      animate={{ opacity: 1, transform: 'translateY(0)' }}
+      exit={{ opacity: 0, transform: shouldReduceMotion ? 'translateY(0)' : 'translateY(-4px)', transition: { duration: shouldReduceMotion ? 0.16 : 0.14, ease: [0.23, 1, 0.32, 1] } }}
+      transition={{ duration: shouldReduceMotion ? 0.16 : 0.18, ease: [0.23, 1, 0.32, 1] }}
       style={{
         alignItems: 'flex-start',
         background: style.background,
@@ -37,7 +44,7 @@ export function InlineNotice({
     >
       <Icon name={style.icon} size={18} />
       <div style={{ color: 'var(--color-text)', flex: 1 }}>{children}</div>
-    </div>
+    </motion.div>
   )
 }
 
@@ -132,7 +139,7 @@ export function ConfirmDialog({
             disabled={busy}
             onClick={onConfirm}
             style={tone === 'danger'
-              ? { background: 'var(--color-expense)', borderColor: 'var(--color-expense)', flex: 1 }
+              ? { background: 'var(--color-danger)', borderColor: 'var(--color-danger)', flex: 1 }
               : { flex: 1 }}
           >
             {confirmLabel}
