@@ -14,16 +14,18 @@ export function DateGroup({ group, categories, onDelete }: Props) {
   const label = dateObj.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' })
 
   return (
-    <div style={{ marginBottom: 4 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0 6px' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text)' }}>{label}</span>
-        <span style={{ fontSize: 11, fontWeight: 700, color: isNeg ? 'var(--color-expense)' : 'var(--color-income)' }}>
+    <section style={{ marginBottom: 10 }}>
+      <header className="transaction-date-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 2px 7px' }}>
+        <h2 className="transaction-date-heading__label" style={{ fontSize: 11, fontWeight: 750, color: 'var(--color-text-secondary)' }}>{label}</h2>
+        <span className="transaction-date-heading__total" style={{ fontSize: 11, fontWeight: 750, color: isNeg ? 'var(--color-expense-text)' : 'var(--color-income-text)' }}>
           {isNeg ? '' : '+'}¥{Math.abs(group.total).toFixed(2)}
         </span>
-      </div>
-      {group.transactions.map(tx => (
-        <TransactionItem key={tx.id} tx={tx} category={catMap[tx.categoryId]} onDelete={onDelete} />
-      ))}
-    </div>
+      </header>
+      <ul style={{ listStyle: 'none', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--shadow-card)' }}>
+        {group.transactions.map(tx => (
+          <TransactionItem key={tx.id} tx={tx} category={catMap[tx.categoryId]} onDelete={onDelete} />
+        ))}
+      </ul>
+    </section>
   )
 }

@@ -3,13 +3,28 @@ import { DataManager } from '../components/settings/DataManager'
 
 export function SettingsPage() {
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: 12 }}>
-      <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--color-text)', marginBottom: 16 }}>设置</div>
-      <WebDAVConfig />
-      <DataManager />
-      <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 24 }}>
+    <div className="page-scroll" style={{ paddingBottom: 'max(32px, env(safe-area-inset-bottom))' }}>
+      <header style={{ marginBottom: 20 }}>
+        <h1 style={{ color: 'var(--color-text)', fontSize: 24, fontWeight: 900 }}>设置</h1>
+        <p style={{ color: 'var(--color-text-small)', fontSize: 13, lineHeight: 1.6, marginTop: 6 }}>
+          管理同步备份和本地数据。
+        </p>
+      </header>
+      <section className="surface" aria-labelledby="sync-settings-title" style={{ padding: 16 }}>
+        <h2 id="sync-settings-title" style={sectionTitle}>同步与备份</h2>
+        <WebDAVConfig />
+      </section>
+      <section className="surface" aria-labelledby="data-settings-title" style={{ marginTop: 14, padding: 16 }}>
+        <h2 id="data-settings-title" style={sectionTitle}>数据管理</h2>
+        <DataManager />
+      </section>
+      <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--color-text-small)', marginTop: 24 }}>
         Kakeibo v0.1.0
       </div>
     </div>
   )
+}
+
+const sectionTitle: React.CSSProperties = {
+  color: 'var(--color-text)', fontSize: 16, fontWeight: 800, marginBottom: 14,
 }

@@ -2,7 +2,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { categoryOps } from '../lib/db'
 import { seedCategories } from '../lib/seed'
 import type { Category } from '../types'
+import type { IconName } from '../components/ui/Icon'
 import { nanoid } from 'nanoid'
+
+export type NewCategoryInput = {
+  name: string
+  icon: IconName
+  type: Category['type']
+}
 
 export function useCategories() {
   const [categories, setCategories] = useState<Category[]>([])
@@ -15,12 +22,14 @@ export function useCategories() {
 
   useEffect(() => { load() }, [load])
 
-  const addCategory = useCallback(async (input: Omit<Category, 'id' | 'createdAt' | 'isSystem' | 'sortOrder'>) => {
+  const addCategory = useCallback(async (input: NewCategoryInput) => {
     const existing = await categoryOps.list()
     const maxSort = existing.reduce((m, c) => Math.max(m, c.sortOrder), 0)
     const cat: Category = {
-      ...input,
       id: nanoid(),
+      name: input.name,
+      icon: input.icon,
+      type: input.type,
       isSystem: false,
       sortOrder: maxSort + 1,
       createdAt: new Date().toISOString(),

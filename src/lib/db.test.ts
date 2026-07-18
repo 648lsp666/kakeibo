@@ -17,7 +17,7 @@ const mockTx = (): Transaction => ({
 const mockCat = (): Category => ({
   id: 'cat-1',
   name: '餐饮',
-  emoji: '🍜',
+  icon: 'food',
   type: 'expense',
   isSystem: true,
   sortOrder: 0,

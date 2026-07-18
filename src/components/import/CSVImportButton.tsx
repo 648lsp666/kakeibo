@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { parseWechatCSV, parseWechatXLSX } from '../../lib/csv-wechat'
 import { parseAlipayCSV } from '../../lib/csv-alipay'
 import type { Transaction } from '../../types'
+import { Icon } from '../ui/Icon'
 
 interface Props {
   onParsed: (txs: Transaction[], source: 'wechat' | 'alipay') => void
@@ -48,10 +49,12 @@ export function CSVImportButton({ onParsed, onError }: Props) {
     <>
       <input ref={inputRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={handleFile} />
       <button
+        type="button"
         onClick={() => inputRef.current?.click()}
-        style={{ background: 'var(--color-tag-system)', color: 'var(--color-text-secondary)', border: 'none', borderRadius: 8, padding: '4px 10px', fontSize: 10, fontWeight: 500, cursor: 'pointer' }}
+        style={{ background: 'var(--color-tag-system)', color: 'var(--color-text-small)', border: 'none', borderRadius: 10, minHeight: 44, padding: '0 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
       >
-        📥 导入 CSV
+        <Icon name="download" size={16} />
+        <span>导入账单</span>
       </button>
     </>
   )

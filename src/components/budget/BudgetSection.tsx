@@ -4,27 +4,35 @@ import { useBudget } from '../../hooks/useBudget'
 import { BudgetCard } from './BudgetCard'
 import { BudgetSetupSheet } from './BudgetSetupSheet'
 import type { BudgetRule } from '../../types'
+import { EmptyState } from '../ui/Feedback'
+import { Icon } from '../ui/Icon'
 
 export function BudgetSection() {
   const { rules, statuses, addRule, updateRule, deleteRule } = useBudget()
   const [editing, setEditing] = useState<BudgetRule | 'new' | null>(null)
 
   return (
-    <div style={{ margin: '12px 16px 0', background: 'var(--color-stat-card)', borderRadius: 14, padding: 14, boxShadow: '0 1px 4px var(--color-stat-shadow)' }}>
+    <section className="surface" style={{ marginTop: 12, padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: rules.length > 0 ? 12 : 0 }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--color-text)' }}>🎯 预算规则</span>
+        <h2 style={{ alignItems: 'center', display: 'flex', fontSize: 14, fontWeight: 800, color: 'var(--color-text)', gap: 8 }}>
+          <Icon name="target" size={18} />预算规则
+        </h2>
         <button
+          type="button"
           onClick={() => setEditing('new')}
-          style={{ background: 'var(--color-bg-secondary)', border: 'none', borderRadius: 8, padding: '4px 10px', fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+          className="secondary-button"
+          style={{ minHeight: 'var(--tap-size)', padding: '0 12px', fontSize: 12 }}
         >
           + 添加
         </button>
       </div>
 
       {rules.length === 0 ? (
-        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', padding: '6px 0 2px' }}>
-          点击「+ 添加」设置预算规则，支持月/年/自定义多规则并行
-        </div>
+        <EmptyState
+          icon="target"
+          title="还没有预算规则"
+          description="设置月、年或自定义预算，及时了解消费进度。"
+        />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {statuses.map(rs => (
@@ -50,6 +58,6 @@ export function BudgetSection() {
           />
         )}
       </AnimatePresence>
-    </div>
+    </section>
   )
 }

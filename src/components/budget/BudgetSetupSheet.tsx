@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { useRef, useState } from 'react'
 import type { BudgetRule, BudgetPeriod } from '../../types'
+import { InlineNotice } from '../ui/Feedback'
+import { Sheet } from '../ui/Sheet'
 
 interface Props {
   current: BudgetRule | null
-  onSave: (b: Omit<BudgetRule, 'id'>) => void
+  onSave: (b: Omit<BudgetRule, 'id'>) => void | Promise<void>
   onDelete: () => void
   onClose: () => void
 }
@@ -21,49 +22,94 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
   const [startDate, setStartDate] = useState(current?.startDate ?? '')
   const [endDate, setEndDate] = useState(current?.endDate ?? '')
   const [error, setError] = useState('')
+  const [invalidField, setInvalidField] = useState<'amount' | 'start' | 'end' | null>(null)
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
+  const amountRef = useRef<HTMLInputElement>(null)
+  const startRef = useRef<HTMLInputElement>(null)
+  const endRef = useRef<HTMLInputElement>(null)
 
-  const handleSave = () => {
+  const showValidation = (message: string, field: 'amount' | 'start' | 'end', target: React.RefObject<HTMLInputElement | null>) => {
+    setError(message)
+    setInvalidField(field)
+    target.current?.focus()
+  }
+
+  const clearError = () => { setError(''); setInvalidField(null) }
+
+  const handleSave = async () => {
+    if (savingRef.current) return
     const amt = parseFloat(amount)
-    if (isNaN(amt) || amt <= 0) { setError('请输入有效金额'); return }
+    if (isNaN(amt) || amt <= 0) { showValidation('请输入有效金额', 'amount', amountRef); return }
     if (period === 'custom') {
-      if (!startDate || !endDate) { setError('请选择开始和结束日期'); return }
-      if (startDate >= endDate) { setError('结束日期须晚于开始日期'); return }
+      if (!startDate) { showValidation('请选择开始日期', 'start', startRef); return }
+      if (!endDate) { showValidation('请选择结束日期', 'end', endRef); return }
+      if (startDate >= endDate) { showValidation('结束日期须晚于开始日期', 'end', endRef); return }
     }
-    onSave({ amount: amt, period, startDate: period === 'custom' ? startDate : undefined, endDate: period === 'custom' ? endDate : undefined })
+    savingRef.current = true
+    setSaving(true)
+    clearError()
+    try {
+      await onSave({ amount: amt, period, startDate: period === 'custom' ? startDate : undefined, endDate: period === 'custom' ? endDate : undefined })
+    } catch {
+      setError('保存失败，请稍后重试')
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'flex-end' }}
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        style={{ width: '100%', maxWidth: 430, margin: '0 auto', background: 'var(--color-bg-card)', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--color-text)', marginBottom: 20 }}>
-          {current ? '编辑预算' : '设置预算'}
+    <Sheet
+      open
+      title={current ? '编辑预算' : '设置预算'}
+      description="设置预算金额和统计周期。"
+      onClose={onClose}
+      closeDisabled={saving}
+      busy={saving}
+      footer={
+        <div style={{ display: 'flex', gap: 8 }}>
+          {current && (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={onDelete}
+              className="secondary-button"
+              style={{ borderColor: 'var(--color-expense)', color: 'var(--color-expense-text)', flexShrink: 0 }}
+            >
+              删除
+            </button>
+          )}
+          <button type="button" disabled={saving} onClick={onClose} className="secondary-button" style={{ flex: 1 }}>
+            取消
+          </button>
+          <button type="button" disabled={saving} onClick={handleSave} className="primary-button" style={{ flex: 2 }}>
+            {saving ? '保存中…' : '保存'}
+          </button>
         </div>
-
+      }
+    >
         {/* Amount */}
         <div style={fieldWrap}>
-          <div style={fieldLabel}>预算金额</div>
+          <label htmlFor="budget-amount" style={fieldLabel}>预算金额</label>
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 20, fontWeight: 700, color: 'var(--color-text)' }}>¥</span>
             <input
+              ref={amountRef}
+              id="budget-amount"
               type="number"
               inputMode="decimal"
               value={amount}
-              onChange={e => { setAmount(e.target.value); setError('') }}
+              aria-invalid={invalidField === 'amount'}
+              aria-describedby={invalidField === 'amount' ? 'budget-error' : undefined}
+              disabled={saving}
+              onChange={e => { setAmount(e.target.value); clearError() }}
               placeholder="0"
               style={{
                 width: '100%', boxSizing: 'border-box', padding: '12px 14px 12px 34px',
                 fontSize: 22, fontWeight: 800, background: 'var(--color-bg-secondary)',
                 border: '2px solid transparent', borderRadius: 12, color: 'var(--color-text)',
-                outline: 'none', appearance: 'none',
+                appearance: 'none',
               }}
             />
           </div>
@@ -71,24 +117,28 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
 
         {/* Period */}
         <div style={fieldWrap}>
-          <div style={fieldLabel}>预算周期</div>
+          <div id="budget-period-label" style={fieldLabel}>预算周期</div>
           <div style={{ display: 'flex', gap: 8 }}>
             {PERIODS.map(p => (
               <button
                 key={p.id}
-                onClick={() => setPeriod(p.id)}
+                type="button"
+                disabled={saving}
+                aria-pressed={period === p.id}
+                aria-describedby="budget-period-label"
+                onClick={() => { setPeriod(p.id); clearError() }}
                 style={{
-                  flex: 1, padding: '10px 0', borderRadius: 12, border: 'none',
+                  flex: 1, minHeight: 'var(--tap-size)', padding: '10px 0', borderRadius: 12, border: 'none',
                   fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                  background: period === p.id ? 'var(--color-tab-active)' : 'var(--color-bg-secondary)',
-                  color: period === p.id ? 'var(--color-fab-text)' : 'var(--color-text)',
+                  background: period === p.id ? 'var(--color-primary)' : 'var(--color-bg-secondary)',
+                  color: period === p.id ? 'var(--color-on-primary)' : 'var(--color-text)',
                 }}
               >
                 {p.label}
               </button>
             ))}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 6 }}>
+          <div style={{ fontSize: 11, color: 'var(--color-text-small)', marginTop: 6 }}>
             {PERIODS.find(p => p.id === period)?.hint}
           </div>
         </div>
@@ -98,36 +148,20 @@ export function BudgetSetupSheet({ current, onSave, onDelete, onClose }: Props) 
           <div style={fieldWrap}>
             <div style={fieldLabel}>日期范围</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={dateInput} />
-              <span style={{ color: 'var(--color-text-tertiary)', fontSize: 13 }}>至</span>
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={dateInput} />
+              <input ref={startRef} aria-label="开始日期" type="date" value={startDate} aria-invalid={invalidField === 'start'} aria-describedby={invalidField === 'start' ? 'budget-error' : undefined} disabled={saving} onChange={e => { setStartDate(e.target.value); clearError() }} style={dateInput} />
+              <span style={{ color: 'var(--color-text-small)', fontSize: 13 }}>至</span>
+              <input ref={endRef} aria-label="结束日期" type="date" value={endDate} aria-invalid={invalidField === 'end'} aria-describedby={invalidField === 'end' ? 'budget-error' : undefined} disabled={saving} onChange={e => { setEndDate(e.target.value); clearError() }} style={dateInput} />
             </div>
           </div>
         )}
 
         {error && (
-          <div style={{ fontSize: 12, color: '#e11d48', marginBottom: 12, fontWeight: 600 }}>⚠️ {error}</div>
+          <div id="budget-error" style={{ marginBottom: 12 }}><InlineNotice tone="error">{error}</InlineNotice></div>
         )}
-
-        {/* Buttons */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-          {current && (
-            <button onClick={onDelete} style={{ padding: '12px 16px', borderRadius: 12, border: 'none', background: '#fee2e2', color: '#e11d48', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-              删除
-            </button>
-          )}
-          <button onClick={onClose} style={{ flex: 1, padding: '12px 0', borderRadius: 12, border: 'none', background: 'var(--color-bg-secondary)', fontSize: 14, fontWeight: 700, color: 'var(--color-text)', cursor: 'pointer' }}>
-            取消
-          </button>
-          <button onClick={handleSave} style={{ flex: 2, padding: '12px 0', borderRadius: 12, border: 'none', background: 'var(--color-tab-active)', fontSize: 14, fontWeight: 800, color: 'var(--color-fab-text)', cursor: 'pointer' }}>
-            保存
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
+    </Sheet>
   )
 }
 
 const fieldWrap: React.CSSProperties = { marginBottom: 18 }
-const fieldLabel: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }
-const dateInput: React.CSSProperties = { flex: 1, padding: '10px 12px', borderRadius: 10, border: 'none', background: 'var(--color-bg-secondary)', fontSize: 13, color: 'var(--color-text)', outline: 'none' }
+const fieldLabel: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--color-text-small)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }
+const dateInput: React.CSSProperties = { flex: 1, minHeight: 'var(--tap-size)', minWidth: 0, padding: '10px 8px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)', fontSize: 13, color: 'var(--color-text)' }

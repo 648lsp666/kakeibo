@@ -12,31 +12,38 @@ function fmt(n: number) {
 export function BudgetCard({ rs, onEdit }: Props) {
   const { label, spending, limit, pct, isOver, subLabel } = rs
   const pctClamped = Math.min(pct, 1)
-  const barColor = isOver ? '#e11d48' : pct >= 0.8 ? '#f97316' : '#3b82f6'
+  const isWarning = !isOver && pct >= 0.8
+  const barColor = isOver ? 'var(--color-expense)' : isWarning ? 'var(--color-warning)' : 'var(--color-primary)'
+  const textColor = isOver ? 'var(--color-expense-text)' : isWarning ? 'var(--color-warning-text)' : 'var(--color-primary-text)'
+  const statusLabel = isOver ? '已超预算' : isWarning ? '接近预算' : '预算正常'
 
   return (
-    <div
+    <button
+      type="button"
       style={{
-        background: isOver ? 'rgba(225,29,72,0.05)' : pct >= 0.8 ? 'rgba(249,115,22,0.05)' : 'var(--color-bg-secondary)',
+        background: isOver ? 'var(--color-danger-soft)' : isWarning ? 'var(--color-bg-secondary)' : 'var(--color-primary-soft)',
         borderRadius: 12,
         padding: '12px 14px',
-        border: isOver ? '1.5px solid rgba(225,29,72,0.2)' : pct >= 0.8 ? '1.5px solid rgba(249,115,22,0.2)' : '1.5px solid transparent',
+        border: `1.5px solid ${barColor}`,
+        color: 'var(--color-text)',
         cursor: 'pointer',
+        textAlign: 'left',
+        width: '100%',
       }}
       onClick={onEdit}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: isOver ? '#e11d48' : 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          {isOver ? '⚠️ ' : ''}{label}
+        <span style={{ fontSize: 11, fontWeight: 700, color: textColor, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          {label} · {statusLabel}
         </span>
-        <span style={{ fontSize: 12, fontWeight: 800, color: barColor }}>{Math.round(pct * 100)}%</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: textColor }}>{Math.round(pct * 100)}%</span>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 8 }}>
-        <span style={{ fontSize: 18, fontWeight: 900, color: isOver ? '#e11d48' : 'var(--color-text)' }}>
+        <span style={{ fontSize: 18, fontWeight: 900, color: isOver ? 'var(--color-expense-text)' : 'var(--color-text)' }}>
           ¥{fmt(spending)}
         </span>
-        <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>/ ¥{fmt(limit)}</span>
+        <span style={{ fontSize: 12, color: 'var(--color-text-small)' }}>/ ¥{fmt(limit)}</span>
       </div>
 
       <div style={{ height: 5, borderRadius: 3, background: 'var(--color-border)', overflow: 'hidden', marginBottom: 7 }}>
@@ -46,9 +53,9 @@ export function BudgetCard({ rs, onEdit }: Props) {
         }} />
       </div>
 
-      <div style={{ fontSize: 11, color: isOver ? '#e11d48' : 'var(--color-text-secondary)', fontWeight: isOver ? 700 : 400 }}>
+      <div style={{ fontSize: 11, color: textColor, fontWeight: isOver ? 700 : 400 }}>
         {subLabel}
       </div>
-    </div>
+    </button>
   )
 }

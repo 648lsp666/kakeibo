@@ -3,9 +3,9 @@ import { useAppStore } from '../store/appStore'
 import { useStats } from '../hooks/useStats'
 import { useCategories } from '../hooks/useCategories'
 import { useBudget } from '../hooks/useBudget'
-import { getMerchantEmoji } from '../lib/merchants'
 import { MonthPickerSheet } from '../components/ledger/MonthPickerSheet'
 import { BudgetSection } from '../components/budget/BudgetSection'
+import { categoryIconName, Icon } from '../components/ui/Icon'
 
 function shiftMonth(yearMonth: string, delta: number): string {
   const [y, m] = yearMonth.split('-').map(Number)
@@ -40,37 +40,41 @@ export function StatsPage() {
     : null
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', paddingBottom: 24 }}>
+    <div className="page-scroll">
 
       {/* Month nav */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '16px 16px 0' }}>
-        <button onClick={() => setCurrentMonth(shiftMonth(currentMonth, -1))} style={arrowBtn}>‹</button>
-        <button onClick={() => setShowPicker(true)} style={monthBtn}>{year}年{month}月</button>
-        <button onClick={() => setCurrentMonth(shiftMonth(currentMonth, 1))} style={arrowBtn}>›</button>
-      </div>
+      <nav aria-label="统计月份" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+        <button type="button" aria-label="上个月" onClick={() => setCurrentMonth(shiftMonth(currentMonth, -1))} style={arrowBtn}>
+          <Icon name="chevron-left" />
+        </button>
+        <button type="button" aria-label="选择月份" onClick={() => setShowPicker(true)} style={monthBtn}>{year}年{month}月</button>
+        <button type="button" aria-label="下个月" onClick={() => setCurrentMonth(shiftMonth(currentMonth, 1))} style={arrowBtn}>
+          <Icon name="chevron-right" />
+        </button>
+      </nav>
 
       {/* Summary cards */}
-      <div style={{ display: 'flex', gap: 8, padding: '12px 16px 0' }}>
-        <div style={card}>
-          <div style={cardLabel}>支出</div>
-          <div style={{ ...cardValue, color: 'var(--color-expense)' }}>¥{fmt(totalExpense)}</div>
+      <section aria-label="本月收支概览" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 12 }}>
+        <div className="surface" style={card}>
+          <div style={cardLabel}>本月支出</div>
+          <div style={{ ...cardValue, color: 'var(--color-expense-text)' }}>¥{fmt(totalExpense)}</div>
         </div>
-        <div style={card}>
-          <div style={cardLabel}>收入</div>
-          <div style={{ ...cardValue, color: 'var(--color-income)' }}>¥{fmt(totalIncome)}</div>
+        <div className="surface" style={card}>
+          <div style={cardLabel}>本月收入</div>
+          <div style={{ ...cardValue, color: 'var(--color-income-text)' }}>¥{fmt(totalIncome)}</div>
         </div>
-        <div style={card}>
-          <div style={cardLabel}>结余</div>
+        <div className="surface" style={card}>
+          <div style={cardLabel}>本月结余</div>
           <div style={cardValue}>¥{fmt(totalIncome - totalExpense)}</div>
         </div>
-      </div>
+      </section>
 
       {/* Budget rules */}
       <BudgetSection />
 
       {/* 6-month trend */}
-      <div style={section}>
-        <div style={sectionTitle}>近6个月支出趋势</div>
+      <section className="surface" style={section}>
+        <h2 style={sectionTitle}>近 6 个月</h2>
 
         {/* Chart — three fixed-height rows: amount label / bar / month label */}
         <div style={{ position: 'relative', height: CHART_H }}>
@@ -83,10 +87,10 @@ export function StatsPage() {
               zIndex: 2, pointerEvents: 'none',
               display: 'flex', alignItems: 'center', gap: 4,
             }}>
-              <div style={{ flex: 1, borderTop: '1.5px dashed #fb923c', opacity: 0.85 }} />
+              <div style={{ flex: 1, borderTop: '1.5px dashed var(--color-warning)', opacity: 0.85 }} />
               <span style={{
-                fontSize: 9, fontWeight: 700, color: '#fb923c',
-                background: 'var(--color-stat-card)', padding: '1px 5px', borderRadius: 4, flexShrink: 0,
+                fontSize: 9, fontWeight: 700, color: 'var(--color-warning-text)',
+                background: 'var(--color-bg-card)', padding: '1px 5px', borderRadius: 4, flexShrink: 0,
               }}>
                 {monthlyBudgetAmount! >= 1000
                   ? `¥${(monthlyBudgetAmount! / 1000).toFixed(1)}k`
@@ -101,7 +105,7 @@ export function StatsPage() {
               const isCurrent = t.yearMonth === currentMonth
               const isOverBudget = monthlyBudgetAmount != null && t.expense > monthlyBudgetAmount
               const barH = t.expense > 0 ? Math.max(Math.round((t.expense / maxExpense) * BAR_H), 3) : 0
-              const barColor = isOverBudget ? '#f87171' : isCurrent ? '#3b82f6' : '#94a3b8'
+              const barColor = isOverBudget ? 'var(--color-expense)' : isCurrent ? 'var(--color-primary)' : 'var(--color-text-tertiary)'
 
               return (
                 <div key={t.yearMonth} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -110,7 +114,7 @@ export function StatsPage() {
                     {t.expense > 0 && (
                       <span style={{
                         fontSize: 9, fontWeight: 700,
-                        color: isOverBudget ? '#f87171' : isCurrent ? 'var(--color-text)' : 'var(--color-text-tertiary)',
+                        color: isOverBudget ? 'var(--color-expense-text)' : isCurrent ? 'var(--color-text)' : 'var(--color-text-small)',
                       }}>
                         {t.expense >= 1000 ? `${(t.expense / 1000).toFixed(1)}k` : Math.round(t.expense)}
                       </span>
@@ -127,7 +131,7 @@ export function StatsPage() {
                   <div style={{ height: LABEL_H, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{
                       fontSize: 10, fontWeight: isCurrent ? 800 : 500,
-                      color: isCurrent ? 'var(--color-text)' : 'var(--color-text-secondary)',
+                      color: isCurrent ? 'var(--color-text)' : 'var(--color-text-small)',
                     }}>
                       {t.monthLabel}
                     </span>
@@ -141,33 +145,33 @@ export function StatsPage() {
         {/* Legend */}
         <div style={{ display: 'flex', gap: 14, marginTop: 10, justifyContent: 'flex-end' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 2, background: '#3b82f6', opacity: 0.9 }} />
-            <span style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>当月</span>
+            <div style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--color-primary)', opacity: 0.9 }} />
+            <span style={{ fontSize: 10, color: 'var(--color-text-small)' }}>当月</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 2, background: '#94a3b8', opacity: 0.55 }} />
-            <span style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>历史</span>
+            <div style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--color-text-tertiary)', opacity: 0.55 }} />
+            <span style={{ fontSize: 10, color: 'var(--color-text-small)' }}>历史</span>
           </div>
           {monthlyBudgetAmount != null && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <div style={{ width: 16, height: 0, borderTop: '1.5px dashed #fb923c' }} />
-              <span style={{ fontSize: 10, color: '#fb923c' }}>月预算</span>
+              <div style={{ width: 16, height: 0, borderTop: '1.5px dashed var(--color-warning)' }} />
+              <span style={{ fontSize: 10, color: 'var(--color-warning-text)' }}>月预算</span>
             </div>
           )}
           {monthlyTrend.some(t => monthlyBudgetAmount != null && t.expense > monthlyBudgetAmount) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: '#f87171' }} />
-              <span style={{ fontSize: 10, color: '#f87171' }}>超预算</span>
+              <div style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--color-expense)' }} />
+              <span style={{ fontSize: 10, color: 'var(--color-expense-text)' }}>超预算</span>
             </div>
           )}
         </div>
-      </div>
+      </section>
 
       {/* Category breakdown */}
-      <div style={section}>
-        <div style={sectionTitle}>本月支出分类</div>
+      <section className="surface" style={section}>
+        <h2 style={sectionTitle}>本月支出分类</h2>
         {categoryStats.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-text-tertiary)', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-text-small)', fontSize: 13 }}>
             本月暂无支出记录
           </div>
         ) : (
@@ -178,18 +182,18 @@ export function StatsPage() {
                 <div key={stat.categoryId}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 18 }}>{cat?.emoji ?? '📦'}</span>
+                      <span style={rowIcon}><Icon name={categoryIconName(cat)} size={18} /></span>
                       <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>{cat?.name ?? '未分类'}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{Math.round(stat.pct * 100)}%</span>
-                      <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-expense)' }}>¥{fmt(stat.amount)}</span>
+                      <span style={{ fontSize: 11, color: 'var(--color-text-small)' }}>{Math.round(stat.pct * 100)}%</span>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-expense-text)' }}>¥{fmt(stat.amount)}</span>
                     </div>
                   </div>
                   <div style={{ height: 5, borderRadius: 3, background: 'var(--color-bg-secondary)', overflow: 'hidden' }}>
                     <div style={{
                       height: '100%', width: `${stat.pct * 100}%`,
-                      borderRadius: 3, background: '#3b82f6', opacity: 0.65,
+                      borderRadius: 3, background: 'var(--color-primary)', opacity: 0.65,
                       transition: 'width 0.4s ease',
                     }} />
                   </div>
@@ -198,26 +202,26 @@ export function StatsPage() {
             })}
           </div>
         )}
-      </div>
+      </section>
 
       {/* Merchant breakdown */}
       {merchantStats.length > 0 && (
-        <div style={section}>
-          <div style={sectionTitle}>本月商户消费</div>
+        <section className="surface" style={section}>
+          <h2 style={sectionTitle}>本月商户消费</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {merchantStats.map((stat, i) => (
+            {merchantStats.map((stat) => (
               <div key={stat.name}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 18 }}>{getMerchantEmoji(stat.name)}</span>
-                    <div>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>{stat.name}</span>
-                      <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 6 }}>{stat.count} 笔</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 5 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <span style={rowIcon}><Icon name="wallet" size={18} /></span>
+                    <div style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stat.name}</span>
+                      <span style={{ fontSize: 10, color: 'var(--color-text-small)', marginLeft: 6 }}>{stat.count} 笔</span>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{Math.round(stat.pct * 100)}%</span>
-                    <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-expense)' }}>¥{fmt(stat.amount)}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, gap: 8 }}>
+                    <span style={{ fontSize: 11, color: 'var(--color-text-small)' }}>{Math.round(stat.pct * 100)}%</span>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-expense-text)' }}>¥{fmt(stat.amount)}</span>
                   </div>
                 </div>
                 <div style={{ height: 5, borderRadius: 3, background: 'var(--color-bg-secondary)', overflow: 'hidden' }}>
@@ -225,7 +229,7 @@ export function StatsPage() {
                     height: '100%',
                     width: `${stat.pct * 100}%`,
                     borderRadius: 3,
-                    background: `hsl(${220 - i * 18}, 70%, 58%)`,
+                    background: 'var(--color-primary)',
                     opacity: 0.75,
                     transition: 'width 0.4s ease',
                   }} />
@@ -233,7 +237,7 @@ export function StatsPage() {
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
       {showPicker && (
@@ -248,28 +252,29 @@ export function StatsPage() {
 }
 
 const arrowBtn: React.CSSProperties = {
-  background: 'none', border: 'none', padding: '2px 8px',
-  cursor: 'pointer', fontSize: 20, color: 'var(--color-text-secondary)', fontWeight: 700,
+  alignItems: 'center', background: 'none', border: 'none', borderRadius: 'var(--radius-control)',
+  color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'inline-flex',
+  justifyContent: 'center', minHeight: 'var(--tap-size)', minWidth: 'var(--tap-size)',
 }
 const monthBtn: React.CSSProperties = {
-  background: 'none', border: 'none', padding: '2px 4px',
+  background: 'none', border: 'none', borderRadius: 'var(--radius-control)', minHeight: 'var(--tap-size)', padding: '2px 12px',
   cursor: 'pointer', fontSize: 16, fontWeight: 800, color: 'var(--color-text)',
 }
 const card: React.CSSProperties = {
-  flex: 1, background: 'var(--color-stat-card)', borderRadius: 12, padding: '10px 12px',
-  boxShadow: '0 1px 4px var(--color-stat-shadow)',
+  minWidth: 0, padding: '12px 10px',
 }
 const cardLabel: React.CSSProperties = {
-  fontSize: 9, color: 'var(--color-text-tertiary)', fontWeight: 600,
-  textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4,
+  fontSize: 10, color: 'var(--color-text-small)', fontWeight: 600, marginBottom: 5,
 }
 const cardValue: React.CSSProperties = {
-  fontSize: 15, fontWeight: 800, color: 'var(--color-text)',
+  fontSize: 14, fontWeight: 800, color: 'var(--color-text)', overflowWrap: 'anywhere',
 }
 const section: React.CSSProperties = {
-  margin: '12px 16px 0', background: 'var(--color-stat-card)',
-  borderRadius: 14, padding: 14, boxShadow: '0 1px 4px var(--color-stat-shadow)',
+  marginTop: 12, padding: 16,
 }
 const sectionTitle: React.CSSProperties = {
-  fontSize: 12, fontWeight: 800, color: 'var(--color-text)', marginBottom: 14,
+  fontSize: 14, fontWeight: 800, color: 'var(--color-text)', marginBottom: 14,
+}
+const rowIcon: React.CSSProperties = {
+  alignItems: 'center', color: 'var(--color-primary-strong)', display: 'inline-flex', justifyContent: 'center',
 }

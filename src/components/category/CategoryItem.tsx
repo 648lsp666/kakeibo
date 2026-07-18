@@ -1,29 +1,52 @@
 import type { Category } from '../../types'
+import { categoryIconName, Icon } from '../ui/Icon'
 
 interface Props {
   category: Category
-  onDelete: (id: string) => void
+  onDelete: (category: Category) => void
 }
 
 export function CategoryItem({ category, onDelete }: Props) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--color-bg-secondary)', borderRadius: 12, marginBottom: 4 }}>
-      <span style={{ fontSize: 22 }}>{category.emoji}</span>
-      <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{category.name}</span>
-      <span style={{
-        fontSize: 10, padding: '2px 8px', borderRadius: 20,
-        background: category.isSystem ? 'var(--color-tag-system)' : 'var(--color-tag-custom)',
-        color: category.isSystem ? 'var(--color-tag-system-text)' : 'var(--color-tag-custom-text)',
-        fontWeight: 500,
-      }}>
-        {category.isSystem ? '系统' : '自定义'}
+    <div
+      style={{
+        alignItems: 'center',
+        display: 'flex',
+        gap: 12,
+        minHeight: 'var(--tap-size)',
+        padding: '10px 0',
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          alignItems: 'center',
+          background: 'var(--color-primary-soft)',
+          borderRadius: 12,
+          color: 'var(--color-primary-strong)',
+          display: 'flex',
+          flexShrink: 0,
+          height: 40,
+          justifyContent: 'center',
+          width: 40,
+        }}
+      >
+        <Icon name={categoryIconName(category)} size={20} />
       </span>
-      {!category.isSystem && (
+      <span style={{ color: 'var(--color-text)', flex: 1, fontSize: 14, fontWeight: 700, minWidth: 0 }}>
+        {category.name}
+      </span>
+      {category.isSystem ? (
+        <span style={{ color: 'var(--color-text-small)', fontSize: 11 }}>系统</span>
+      ) : (
         <button
-          onClick={() => { if (confirm(`删除「${category.name}」？`)) onDelete(category.id) }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--color-text-secondary)', padding: '0 4px' }}
+          type="button"
+          className="icon-button"
+          aria-label={`删除${category.name}`}
+          onClick={() => onDelete(category)}
+          style={{ color: 'var(--color-expense-text)', flexShrink: 0 }}
         >
-          🗑️
+          <Icon name="trash" size={18} />
         </button>
       )}
     </div>

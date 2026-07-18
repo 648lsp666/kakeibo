@@ -7,6 +7,7 @@ import { MonthPickerSheet } from '../components/ledger/MonthPickerSheet'
 import { TransactionList } from '../components/ledger/TransactionList'
 import { CSVImportButton } from '../components/import/CSVImportButton'
 import { CSVPreviewSheet } from '../components/import/CSVPreviewSheet'
+import { InlineNotice } from '../components/ui/Feedback'
 import { transactionOps } from '../lib/db'
 import type { Transaction } from '../types'
 
@@ -24,9 +25,11 @@ export function LedgerPage() {
   const [preview, setPreview] = useState<{ txs: Transaction[]; source: 'wechat' | 'alipay'; duplicateIds: Set<string> } | null>(null)
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState('')
+  const [importError, setImportError] = useState('')
   const [showPicker, setShowPicker] = useState(false)
 
   const handleParsed = async (txs: Transaction[], source: 'wechat' | 'alipay') => {
+    setImportError('')
     const allManual = (await transactionOps.getAll()).filter(t => t.source === 'manual')
     const manualKeys = new Set(allManual.map(t => `${t.categoryId}|${t.amount.toFixed(2)}`))
     const duplicateIds = new Set(txs.filter(t => manualKeys.has(`${t.categoryId}|${t.amount.toFixed(2)}`)).map(t => t.id))
@@ -34,19 +37,29 @@ export function LedgerPage() {
   }
 
   const handleConfirm = async () => {
-    if (!preview) return
+    if (!preview || importing) return
     setImporting(true)
-    const result = await importTransactions(preview.txs)
-    setImporting(false)
-    setPreview(null)
-    setImportMsg(`✅ 导入完成：新增 ${result.added} 条，跳过重复 ${result.skipped} 条`)
-    setTimeout(() => setImportMsg(''), 4000)
+    setImportError('')
+    try {
+      const result = await importTransactions(preview.txs)
+      setPreview(null)
+      setImportMsg(`导入完成：新增 ${result.added} 条，跳过重复 ${result.skipped} 条`)
+      setTimeout(() => setImportMsg(''), 4000)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '请稍后重试'
+      setImportError(`导入失败：${message}`)
+    } finally {
+      setImporting(false)
+    }
   }
 
   const importButton = (
     <CSVImportButton
       onParsed={handleParsed}
-      onError={msg => alert(`导入失败：${msg}`)}
+      onError={msg => {
+        setImportMsg('')
+        setImportError(`导入失败：${msg}`)
+      }}
     />
   )
 
@@ -61,9 +74,10 @@ export function LedgerPage() {
         onPickMonth={() => setShowPicker(true)}
       />
 
-      {importMsg && (
-        <div style={{ margin: '8px 12px 0', padding: '8px 12px', background: '#f0fdf4', borderRadius: 10, fontSize: 12, color: '#16a34a', fontWeight: 600 }}>
-          {importMsg}
+      {(importMsg || (importError && !preview)) && (
+        <div style={{ margin: '10px 16px 0' }}>
+          {importMsg && <InlineNotice tone="success">{importMsg}</InlineNotice>}
+          {importError && <InlineNotice tone="error">{importError}</InlineNotice>}
         </div>
       )}
 
@@ -77,6 +91,7 @@ export function LedgerPage() {
           onConfirm={handleConfirm}
           onCancel={() => setPreview(null)}
           importing={importing}
+          error={importError}
         />
       )}
 
